@@ -510,19 +510,17 @@ const Auth = {
     hideErr('signupErr');
     const first=$('su-first').value.trim(),last=$('su-last').value.trim(),
           email=$('su-email').value.trim(),pw=$('su-pw').value,
-          role=$('su-role').value,level=$('su-level').value,
-          age=$('su-age').value,club=$('su-club').value.trim();
-    if(!first||!last||!email||!pw||!role){showErr('signupErr','Please fill in all required fields.');return;}
+          role=$('su-role').value||'coach',level=$('su-level').value||'',
+          age=$('su-age').value||'',club=$('su-club').value.trim()||'';
+    if(!first||!last||!email||!pw){showErr('signupErr','Please fill in First Name, Last Name, Email and Password.');return;}
     if(pw.length<6){showErr('signupErr','Password must be at least 6 characters.');return;}
     const{data,error}=await sb.auth.signUp({email,password:pw,options:{data:{first_name:first,last_name:last,role}}});
     if(error){showErr('signupErr',error.message);return;}
-    if(data.user){
-      // Update profile with extra fields
-      await sb.from('profiles').upsert({id:data.user.id,first_name:first,last_name:last,email,role,age_group:age,club,level});
-      await App.boot(data.user);
-    } else {
-      showErr('signupErr','Check your email to confirm your account, then sign in.');
-    }
+    if(!data.user){showErr('signupErr','Signup failed — please try again.');return;}
+    const profData={id:data.user.id,first_name:first,last_name:last,email,role,age_group:age,club,level,color:'#84cc16'};
+    const{error:pe}=await sb.from('profiles').upsert(profData,{onConflict:'id'});
+    if(pe){console.warn('Profile note:',pe.message);}
+    await App.boot(data.user);
   },
 
   async login(){
@@ -546,12 +544,24 @@ const App = {
     $('app').classList.add('visible');
     $('topbarUser').textContent=user.email;
 
-    // Load profile
-    let{data:profile}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
+    // Load profile — try up to 3 times in case trigger is slow
+    let profile=null;
+    for(let i=0;i<3;i++){
+      const{data}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
+      if(data){profile=data;break;}
+      await new Promise(r=>setTimeout(r,600));
+    }
+    // If still no profile, create one directly
     if(!profile){
       const meta=user.user_metadata||{};
-      await sb.from('profiles').insert({id:user.id,email:user.email,first_name:meta.first_name||'',last_name:meta.last_name||'',role:meta.role||'coach'});
-      ({data:profile}=await sb.from('profiles').select('*').eq('id',user.id).single());
+      const insData={id:user.id,email:user.email,first_name:meta.first_name||'',last_name:meta.last_name||'',role:meta.role||'coach',color:'#84cc16'};
+      await sb.from('profiles').upsert(insData,{onConflict:'id'});
+      const{data:p2}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
+      profile=p2;
+    }
+    if(!profile){
+      // Fallback — build profile from user object
+      profile={id:user.id,email:user.email,first_name:user.user_metadata?.first_name||'',last_name:user.user_metadata?.last_name||'',role:user.user_metadata?.role||'coach',color:'#84cc16'};
     }
     State.profile=profile;
 
