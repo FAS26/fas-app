@@ -1,0 +1,35 @@
+{
+  "name": "FAS — For Athlete Sake",
+  "short_name": "FAS",
+  "description": "Coaching development platform for player-centred coaches",
+  "start_url": "/fas-app/",
+  "scope": "/fas-app/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#052e16",
+  "theme_color": "#14532d",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "share_target": {
+    "action": "/fas-app/",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "categories": ["sports", "education", "productivity"]
+}
