@@ -762,10 +762,11 @@ const Sessions={
         <div class="card-title">Session Transcript</div>
         <div class="upload-zone" onclick="$('nsFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="Sessions.handleDrop(event)" id="nsZone">
           <div class="upload-icon">🎙️</div>
-          <p style="font-size:13px;color:var(--text-muted)"><strong>Click to upload</strong> or drag and drop</p>
-          <p style="font-size:11px;color:var(--text-faint);margin-top:4px">.mp3 · .m4a · .wav · .txt · .docx</p>
+          <p style="font-size:13px;color:var(--text-muted)"><strong>Click to upload</strong> a voice memo or transcript</p>
+          <p style="font-size:11px;color:var(--text-faint);margin-top:4px">Voice Memo · .mp3 · .m4a · .wav · .txt — audio is auto-transcribed by AI</p>
         </div>
-        <input type="file" id="nsFile" style="display:none" accept=".mp3,.m4a,.wav,.mp4,.txt,.docx" onchange="Sessions.handleFile(this)">
+        <input type="file" id="nsFile" style="display:none" accept=".mp3,.m4a,.wav,.m4v,.mp4,.txt" onchange="Sessions.handleFile(this)">
+        <input type="hidden" id="ns-transcribing" value="false">
         <div style="text-align:center;padding:10px 0;color:var(--text-faint);font-size:12px">— or paste transcript below —</div>
         <textarea id="ns-transcript" class="input" placeholder="Paste your session transcript here..." style="min-height:150px"></textarea>
       </div>
@@ -782,19 +783,22 @@ const Sessions={
   handleFile(input){
     const file=input.files[0];if(!file)return;
     const z=$('nsZone');
+    const flag=$('ns-transcribing');
     if(file.name.match(/\.txt$/i)){
       const r=new FileReader();
       r.onload=e=>{const el=$('ns-transcript');if(el)el.value=e.target.result;};
       r.readAsText(file);
-      if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> ready</p>`;
-    } else if(file.name.match(/\.(mp3|m4a|wav|mp4|webm|ogg|aac)$/i)){
-      if(z)z.innerHTML=`<div class="upload-icon">⏳</div><p><strong>Transcribing audio…</strong><br>This takes about 20-40 seconds. Please wait.</p>`;
+      if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> ready — click Analyse below.</p>`;
+    } else if(file.name.match(/\.(mp3|m4a|wav|mp4|m4v|webm|ogg|aac|caf)$/i)){
+      if(flag)flag.value='true';
+      if(z)z.innerHTML=`<div class="upload-icon">⏳</div><p><strong>Transcribing audio…</strong><br>This takes about 20-40 seconds. Please wait — the Analyse button will activate when done.</p>`;
       Sessions.transcribeAudio(file).then(transcript=>{
+        if(flag)flag.value='false';
         if(transcript){
           const el=$('ns-transcript');if(el)el.value=transcript;
-          if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> transcribed successfully.<br>Review the text below then click Analyse.</p>`;
+          if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> transcribed ✓<br>Review the text below then click Analyse Session.</p>`;
         } else {
-          if(z)z.innerHTML=`<div class="upload-icon">❌</div><p>Transcription failed. Please paste your transcript manually below.</p>`;
+          if(z)z.innerHTML=`<div class="upload-icon">❌</div><p>Transcription failed. Please paste your transcript in the box below manually.</p>`;
         }
       });
     } else {
@@ -835,11 +839,16 @@ const Sessions={
   },
 
   async analyse(){
+    const flag=$('ns-transcribing');
+    if(flag&&flag.value==='true'){
+      alert('Audio is still being transcribed — please wait a moment then try again.');
+      return;
+    }
     const title=$('ns-title')?.value?.trim()||'Untitled Session';
     const date=$('ns-date')?.value||new Date().toISOString().slice(0,10);
     const ag=$('ns-age')?.value||'';
     const transcript=$('ns-transcript')?.value?.trim()||'';
-    if(!transcript){alert('Please paste a transcript or upload a file.');return;}
+    if(!transcript){alert('Please paste a transcript or upload a voice memo file first.');return;}
     $('ns-processing').style.display='block';
     const metrics=Sessions.parseTranscript(transcript);
     const aiResult=await Sessions.callAI(transcript,title,ag,metrics);
