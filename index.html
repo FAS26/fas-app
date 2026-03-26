@@ -357,7 +357,6 @@ textarea.input{resize:vertical;min-height:80px;line-height:1.6;}
       <button class="nav-link" id="nav-journey" onclick="Nav.go('journey')"><span class="nav-icon">🌿</span><span>My Journey</span></button>
       <button class="nav-link" id="nav-community" onclick="Nav.go('community')"><span class="nav-icon">💬</span><span>Community</span></button>
       <button class="nav-link" id="nav-resources" onclick="Nav.go('resources')"><span class="nav-icon">📚</span><span>Resources</span></button>
-      <button class="nav-link" id="nav-director" onclick="Nav.go('director')" style="display:none"><span class="nav-icon">🏛️</span><span>Director</span></button>
       <div class="nav-divider"></div>
       <div id="subNav"></div>
     </aside>
@@ -372,7 +371,6 @@ textarea.input{resize:vertical;min-height:80px;line-height:1.6;}
       <div class="mobile-tab" id="mob-team" onclick="Nav.go('team')"><span class="mobile-tab-icon">👥</span><span class="mobile-tab-label">Team</span></div>
       <div class="mobile-tab" id="mob-journey" onclick="Nav.go('journey')"><span class="mobile-tab-icon">🌿</span><span class="mobile-tab-label">Journey</span></div>
       <div class="mobile-tab" id="mob-resources" onclick="Nav.go('resources')"><span class="mobile-tab-icon">📚</span><span class="mobile-tab-label">More</span></div>
-      <div class="mobile-tab" id="mob-director" onclick="Nav.go('director')" style="display:none"><span class="mobile-tab-icon">🏛️</span><span class="mobile-tab-label">Director</span></div>
     </div>
   </nav>
 </div>
@@ -658,11 +656,7 @@ const App={
     const isCoach=role==='coach'||role==='both';
 
     // Show/hide nav based on role
-    if(isDirector){
-      // Show director nav button
-      const dn=$('nav-director');if(dn)dn.style.display='flex';
-      const md=$('mob-director');if(md)md.style.display='flex';
-    }
+    // Director nav is handled by the toggle button and two-panel layout
     if(!isCoach){
       // Hide all coach-only nav for pure directors
       ['nav-sessions','nav-gameday','nav-team','nav-community','nav-resources',
@@ -694,7 +688,6 @@ const App={
       coachOnly.forEach(id=>{const el=$(id);if(el)el.style.display='none'});
       const jn=$('nav-journey');if(jn)jn.style.display='flex';
       const mj=$('mob-journey');if(mj)mj.style.display='flex';
-      const dn=$('nav-director');if(dn)dn.style.display='flex';
       // Update button styles
       $('coachViewBtn')?.classList.remove('btn-primary');
       $('directorViewBtn')?.classList.add('btn-primary');
