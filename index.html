@@ -340,9 +340,9 @@ textarea.input{resize:vertical;min-height:80px;line-height:1.6;}
       <div class="topbar-sub">For Athlete Sake</div>
     </div>
     <div class="topbar-right">
-      <div id="roleSwitcher" style="display:none">
-        <button class="topbar-btn" id="coachViewBtn" onclick="App.switchView('coach')" style="margin-right:4px">Coach View</button>
-        <button class="topbar-btn" id="directorViewBtn" onclick="App.switchView('director')">Director View</button>
+      <div id="roleSwitcher" style="display:none;background:var(--dark-mid);border-radius:var(--radius-xs);padding:3px;gap:2px">
+        <button id="coachViewBtn" onclick="App.switchView('coach')" style="padding:5px 12px;border-radius:calc(var(--radius-xs) - 2px);border:none;background:var(--lime);color:var(--dark-deep);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">⚽ Coach</button>
+        <button id="directorViewBtn" onclick="App.switchView('director')" style="padding:5px 12px;border-radius:calc(var(--radius-xs) - 2px);border:none;background:transparent;color:var(--lime-muted);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">🏛️ Director</button>
       </div>
       <span class="topbar-user" id="topbarUser"></span>
       <button class="topbar-btn" onclick="Auth.logout()">Sign out</button>
@@ -2130,261 +2130,555 @@ const Journey={
 
 // ── DIRECTOR DASHBOARD ─────────────────────────────────────────────────────────
 const Director={
+
   render(sub){
-    if(!sub||sub==='overview') Director.renderOverview();
+    const role=State.profile?.role||'coach';
+    const isCoach=role==='coach'||role==='both';
+    // Always show toggle if both roles
+    if(role==='both'){const rs=$('roleSwitcher');if(rs)rs.style.display='flex';}
+    if(!sub||sub==='coaches') Director.renderCoaches();
+    else if(sub==='culture') Director.renderCulture();
+    else if(sub==='tasks') Director.renderTasks();
+    else if(sub==='journey') Journey.render('bamboo');
     else if(sub==='setup') Director.renderSetup();
   },
 
-  async renderOverview(){
-    State.currentSubSection='overview';
+  renderSideTabs(active){
+    const tabs=[
+      {id:'coaches',label:'Coaches',icon:'👥'},
+      {id:'culture',label:'Culture Upload',icon:'📁'},
+      {id:'tasks',label:'My Tasks',icon:'✅'},
+      {id:'journey',label:'My Journey',icon:'🌿'},
+    ];
+    return `<div style="display:flex;flex-direction:column;gap:2px;padding:8px">
+      ${tabs.map(t=>`<button style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-xs);border:none;background:${t.id===active?'var(--lime)':'transparent'};color:${t.id===active?'var(--dark-deep)':'#86efac'};font-family:var(--font);font-size:13px;font-weight:${t.id===active?'700':'500'};cursor:pointer;width:100%;text-align:left;transition:all .12s" onclick="Nav.go('director','${t.id}')" onmouseover="if('${t.id}'!=='${active}')this.style.background='var(--dark-mid)'" onmouseout="if('${t.id}'!=='${active}')this.style.background='transparent'">
+        <span style="font-size:15px;width:20px;text-align:center">${t.icon}</span>${t.label}
+      </button>`).join('')}
+      <div style="height:1px;background:var(--dark-mid);margin:8px 4px"></div>
+      <button style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-xs);border:none;background:transparent;color:#86efac;font-family:var(--font);font-size:13px;cursor:pointer;width:100%;text-align:left" onclick="Director.renderSetup()">
+        <span style="font-size:15px;width:20px;text-align:center">⚙️</span>Club Settings
+      </button>
+    </div>`;
+  },
+
+  setLayout(active, mainHtml){
+    // Render two-panel layout: director sidetabs + main content
+    setMain(`<div style="display:flex;height:100%;min-height:calc(100vh - 54px)">
+      <div style="width:200px;flex-shrink:0;background:var(--dark);border-right:1px solid var(--dark-mid);overflow-y:auto">
+        <div style="padding:16px 14px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--lime-muted)">Director</div>
+        ${Director.renderSideTabs(active)}
+      </div>
+      <div style="flex:1;overflow-y:auto;background:var(--bg)">${mainHtml}</div>
+    </div>`);
+  },
+
+  // ── COACHES TAB ────────────────────────────────────────────────────────────
+  async renderCoaches(){
+    State.currentSubSection='coaches';
     const profile=State.profile;
-
-    // Load this director's club
     const{data:myClub}=await sb.from('clubs').select('*').eq('director_id',profile.id).maybeSingle();
+    if(!myClub){Director.renderSetup();return;}
 
-    if(!myClub){
-      Director.renderSetup();
-      return;
-    }
-
-    // Load coaches in this club (excluding the director themselves)
     const{data:members}=await sb.from('profiles').select('*').eq('club_id',myClub.id);
     const coaches=(members||[]).filter(m=>m.id!==profile.id);
 
-    // Load data for all coaches
-    let allSessions=[];let allRoadmaps=[];let allEmails=[];
+    let allSessions=[],allRoadmaps=[],allEmails=[],allNotes=[];
     if(coaches.length){
       const ids=coaches.map(c=>c.id);
-      const[{data:s},{data:r},{data:e}]=await Promise.all([
-        sb.from('sessions').select('id,user_id,title,date,grade,qi_ratio,pc_ratio,session_objective,created_at').in('user_id',ids).order('created_at',{ascending:false}),
+      const[{data:s},{data:r},{data:e},{data:n}]=await Promise.all([
+        sb.from('sessions').select('id,user_id,title,date,grade,qi_ratio,session_objective,created_at').in('user_id',ids).order('created_at',{ascending:false}),
         sb.from('roadmap').select('user_id,checked').in('user_id',ids),
-        sb.from('weekly_emails').select('user_id,sent').in('user_id',ids)
+        sb.from('weekly_emails').select('user_id,sent').in('user_id',ids),
+        sb.from('director_notes').select('*').eq('director_id',profile.id)
       ]);
-      allSessions=s||[];allRoadmaps=r||[];allEmails=e||[];
+      allSessions=s||[];allRoadmaps=r||[];allEmails=e||[];allNotes=n||[];
     }
 
-    // Build stats per coach
     const stats=coaches.map(coach=>{
       const cs=allSessions.filter(s=>s.user_id===coach.id);
       const training=cs.filter(s=>!s.session_objective?.startsWith('GAMEDAY'));
-      const games=cs.filter(s=>s.session_objective?.startsWith('GAMEDAY'));
       const avgQI=training.length?training.reduce((a,s)=>a+parseFloat(s.qi_ratio||0),0)/training.length:0;
       const lastUp=cs[0];
       const daysSince=lastUp?Math.floor((new Date()-new Date(lastUp.created_at))/(1000*60*60*24)):999;
       const roadmapDone=(allRoadmaps.filter(r=>r.user_id===coach.id&&r.checked)).length;
       const emailsSent=(allEmails.filter(e=>e.user_id===coach.id&&e.sent)).length;
       const latestGrade=training[0]?.grade||'—';
-      return{coach,training,games,avgQI,daysSince,roadmapDone,emailsSent,latestGrade};
+      const notes=allNotes.filter(n=>n.coach_id===coach.id);
+      const lastContact=notes.length?notes.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0]:null;
+      const daysSinceContact=lastContact?Math.floor((new Date()-new Date(lastContact.created_at))/(1000*60*60*24)):999;
+      return{coach,training,avgQI,daysSince,roadmapDone,emailsSent,latestGrade,notes,daysSinceContact};
     });
 
-    const inactive=stats.filter(s=>s.daysSince>14);
-    const avgClubQI=stats.length?stats.reduce((a,s)=>a+s.avgQI,0)/stats.length:0;
+    const needsContact=stats.filter(s=>s.daysSinceContact>14);
+    const needsUpload=stats.filter(s=>s.daysSince>14);
 
-    setMain(`
+    const mainHtml=`
     <div class="page-header">
-      <div>
-        <h1>${myClub.name}</h1>
-        <p>Club Code: <strong style="color:var(--lime);letter-spacing:2px;font-size:14px">${myClub.code}</strong> · ${coaches.length} coach${coaches.length!==1?'es':''} · Share this code with coaches when they sign up</p>
-      </div>
-      <button class="btn btn-sm btn-dark" onclick="Director.renderSetup()">⚙️ Settings</button>
+      <div><h1>${myClub.name}</h1><p>Code: <strong style="color:var(--lime);letter-spacing:2px">${myClub.code}</strong> · ${coaches.length} coach${coaches.length!==1?'es':''}</p></div>
     </div>
     <div class="page-body">
+      ${needsContact.length?`<div class="alert alert-warn"><strong>⚠ Check-in needed:</strong> ${needsContact.map(s=>s.coach.first_name+' '+s.coach.last_name).join(', ')} — no contact logged in 14+ days.</div>`:''}
+      ${needsUpload.length?`<div class="alert alert-warn"><strong>⚠ No upload:</strong> ${needsUpload.map(s=>s.coach.first_name+' '+s.coach.last_name).join(', ')} — no session in 14+ days.</div>`:''}
 
-      ${inactive.length?`<div class="alert alert-warn"><strong>⚠ Inactive:</strong> ${inactive.map(s=>s.coach.first_name+' '+s.coach.last_name).join(', ')} — no upload in 14+ days.</div>`:''}
-
-      <div class="grid-3" style="margin-bottom:16px">
-        <div class="metric-card"><div class="metric-label">Club Avg Q:I</div><div class="metric-value" style="color:${avgClubQI>=0.5?'var(--lime)':'#fbbf24'}">${avgClubQI.toFixed(2)}</div><div class="metric-sub">Target ≥ 0.5</div></div>
-        <div class="metric-card"><div class="metric-label">Total Sessions</div><div class="metric-value">${allSessions.filter(s=>!s.session_objective?.startsWith('GAMEDAY')).length}</div><div class="metric-sub">Across all coaches</div></div>
-        <div class="metric-card"><div class="metric-label">Active Coaches</div><div class="metric-value">${stats.filter(s=>s.daysSince<=14).length}/${coaches.length}</div><div class="metric-sub">Uploaded this fortnight</div></div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Coaches — click any coach to see their details</div>
-        ${!coaches.length?`
-        <div class="empty" style="padding:28px">
-          <div class="empty-icon">👥</div>
-          <h3>No coaches yet</h3>
-          <p>Share your club code <strong style="color:var(--lime)">${myClub.code}</strong> with your coaches. They enter it when signing up and will appear here automatically.</p>
-        </div>`:''}
-        ${stats.map(({coach,training,games,avgQI,daysSince,roadmapDone,emailsSent,latestGrade})=>`
-        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px;cursor:pointer;transition:all .15s"
-          onclick="Director.viewCoach('${coach.id}')"
-          onmouseover="this.style.borderColor='var(--lime)';this.style.boxShadow='0 2px 8px rgba(132,204,22,.15)'"
-          onmouseout="this.style.borderColor='var(--border)';this.style.boxShadow='none'">
-          <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-            <div style="width:46px;height:46px;border-radius:50%;background:var(--dark);color:var(--lime);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;flex-shrink:0">${coach.first_name?.charAt(0)||'?'}</div>
-            <div style="flex:1">
-              <div style="font-size:16px;font-weight:700;color:var(--dark)">${coach.first_name} ${coach.last_name}</div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${coach.age_group||'—'} · ${coach.level||'—'} · ${coach.club||'—'}</div>
-            </div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-              <div class="grade ${Sessions.gradeClass(latestGrade)}" style="width:36px;height:36px;font-size:15px">${latestGrade}</div>
-              <span class="badge ${daysSince>14?'badge-red':daysSince<=3?'badge-green':'badge-amber'}">${daysSince>14?'Inactive '+daysSince+'d':daysSince===0?'Today':daysSince+'d ago'}</span>
-            </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Connection Heatmap — Your Coaches</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;font-size:11px;color:var(--text-muted)">
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:#22c55e;display:inline-block"></span>Active contact</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:#f59e0b;display:inline-block"></span>14+ days</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border-radius:2px;background:#ef4444;display:inline-block"></span>No contact</span>
+        </div>
+        ${stats.map(({coach,daysSinceContact,notes,latestGrade,daysSince})=>`
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="Director.viewCoach('${coach.id}')">
+          <div style="width:38px;height:38px;border-radius:50%;background:var(--dark);color:var(--lime);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0">${coach.first_name?.charAt(0)||'?'}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">${coach.first_name} ${coach.last_name}</div>
+            <div style="font-size:11px;color:var(--text-muted)">${coach.age_group||'—'} · Last session: ${daysSince===999?'Never':daysSince+'d ago'}</div>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
-            ${[
-              {label:'Sessions',val:training.length},
-              {label:'Avg Q:I',val:avgQI.toFixed(2),color:avgQI>=0.5?'#15803d':'#d97706'},
-              {label:'Roadmap',val:roadmapDone+' done'},
-              {label:'Emails Sent',val:emailsSent}
-            ].map(m=>`<div style="text-align:center;padding:10px 8px;background:var(--lime-pale);border-radius:var(--radius-xs)">
-              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">${m.label}</div>
-              <div style="font-size:18px;font-weight:700;color:${m.color||'var(--dark)'}">${m.val}</div>
-            </div>`).join('')}
+          <div style="display:flex;gap:6px;align-items:center">
+            <div style="width:14px;height:38px;border-radius:3px;background:${daysSinceContact<=7?'#22c55e':daysSinceContact<=14?'#f59e0b':'#ef4444'};opacity:.85"></div>
+            <div class="grade ${Sessions.gradeClass(latestGrade)}" style="width:30px;height:30px;font-size:13px">${latestGrade}</div>
+            <span style="font-size:11px;color:var(--lime);font-weight:600">View →</span>
           </div>
-          <div style="margin-top:10px;text-align:right;font-size:12px;color:var(--lime);font-weight:600">View full details →</div>
         </div>`).join('')}
+        ${!coaches.length?`<div class="empty" style="padding:24px"><div class="empty-icon">👥</div><h3>No coaches yet</h3><p>Share code <strong style="color:var(--lime)">${myClub.code}</strong> with coaches to add them.</p></div>`:''}
       </div>
-    </div>`);
+    </div>`;
+    Director.setLayout('coaches',mainHtml);
   },
 
-
+  // ── COACH DETAIL ───────────────────────────────────────────────────────────
   async viewCoach(coachId){
-    State.currentSubSection='coach';
     State.viewingCoachId=coachId;
     const{data:coach}=await sb.from('profiles').select('*').eq('id',coachId).single();
-    const[{data:sessions},{data:roadmap},{data:emails}]=await Promise.all([
-      sb.from('sessions').select('id,title,date,age_group,grade,qi_ratio,pc_ratio,high_order_q,low_order_q,individual_praise,freeze_moment,show_me_count,focus_area_1,focus_area_2,actions,session_objective,created_at').eq('user_id',coachId).order('created_at',{ascending:false}),
+    const[{data:sessions},{data:roadmap},{data:notes}]=await Promise.all([
+      sb.from('sessions').select('id,title,date,age_group,grade,qi_ratio,pc_ratio,high_order_q,low_order_q,individual_praise,freeze_moment,show_me_count,focus_area_1,focus_area_2,actions,session_objective,encouragement,created_at').eq('user_id',coachId).order('date',{ascending:false}),
       sb.from('roadmap').select('*').eq('user_id',coachId),
-      sb.from('weekly_emails').select('*').eq('user_id',coachId)
+      sb.from('director_notes').select('*').eq('coach_id',coachId).eq('director_id',State.profile.id).order('created_at',{ascending:false})
     ]);
 
-    const trainingSessions=(sessions||[]).filter(s=>!s.session_objective?.startsWith('GAMEDAY'));
-    const gameDays=(sessions||[]).filter(s=>s.session_objective?.startsWith('GAMEDAY'));
-    const sorted=[...trainingSessions].sort((a,b)=>new Date(a.date)-new Date(b.date));
-    const avgQI=trainingSessions.length?trainingSessions.reduce((a,s)=>a+parseFloat(s.qi_ratio||0),0)/trainingSessions.length:0;
-    const avgPC=trainingSessions.length?trainingSessions.reduce((a,s)=>a+parseFloat(s.pc_ratio||0),0)/trainingSessions.length:0;
-    const roadmapDone=(roadmap||[]).filter(r=>r.checked).length;
-    const emailsSent=(emails||[]).filter(e=>e.sent).length;
+    const training=(sessions||[]).filter(s=>!s.session_objective?.startsWith('GAMEDAY'));
+    const games=(sessions||[]).filter(s=>s.session_objective?.startsWith('GAMEDAY'));
+    const sorted=[...training].sort((a,b)=>new Date(a.date)-new Date(b.date));
     const fw=getAgeFramework(coach.age_group||'U13');
 
-    setMain(`
+    // Top strengths — from encouragement text
+    const avgQI=training.length?training.reduce((a,s)=>a+parseFloat(s.qi_ratio||0),0)/training.length:0;
+    const avgPC=training.length?training.reduce((a,s)=>a+parseFloat(s.pc_ratio||0),0)/training.length:0;
+    const avgHQ=training.length?training.reduce((a,s)=>a+parseInt(s.high_order_q||0),0)/training.length:0;
+    const roadmapDone=(roadmap||[]).filter(r=>r.checked);
+
+    // Focus area frequency — what keeps coming up
+    const focusCount={};
+    training.forEach(s=>{
+      if(s.focus_area_1)focusCount[s.focus_area_1]=(focusCount[s.focus_area_1]||0)+1;
+      if(s.focus_area_2)focusCount[s.focus_area_2]=(focusCount[s.focus_area_2]||0)+1;
+    });
+    const topFocus=Object.entries(focusCount).sort((a,b)=>b[1]-a[1]).slice(0,3);
+
+    const mainHtml=`
     <div class="page-header">
       <div>
         <h1>${coach.first_name} ${coach.last_name}</h1>
         <p>${coach.age_group||'—'} · ${coach.level||'—'} · ${fw.phase}</p>
       </div>
-      <button class="btn btn-sm" onclick="Director.renderOverview()">← Back to Club</button>
+      <button class="btn btn-sm" onclick="Director.renderCoaches()">← All Coaches</button>
     </div>
     <div class="page-body">
-      <div class="grid-4" style="margin-bottom:16px">
-        <div class="metric-card"><div class="metric-label">Avg Q:I</div><div class="metric-value" style="color:${avgQI>=fw.qiTarget?'var(--lime)':'#fbbf24'}">${avgQI.toFixed(2)}</div><div class="metric-sub">Target ≥${fw.qiTarget}</div></div>
-        <div class="metric-card"><div class="metric-label">Avg P:C</div><div class="metric-value" style="color:${avgPC>=fw.pcTarget?'var(--lime)':'#fbbf24'}">${avgPC.toFixed(2)}</div><div class="metric-sub">Target ≥${fw.pcTarget}</div></div>
-        <div class="metric-card"><div class="metric-label">Sessions</div><div class="metric-value">${trainingSessions.length}</div><div class="metric-sub">+ ${gameDays.length} game days</div></div>
-        <div class="metric-card"><div class="metric-label">Roadmap</div><div class="metric-value">${roadmapDone}</div><div class="metric-sub">Items complete</div></div>
+      <div class="tabs" style="margin-bottom:16px">
+        <button class="tab-btn active" id="dct-1" onclick="Director.coachTab(1,'${coachId}')">Progress Tracker</button>
+        <button class="tab-btn" id="dct-2" onclick="Director.coachTab(2,'${coachId}')">Roadmap Progress</button>
+        <button class="tab-btn" id="dct-3" onclick="Director.coachTab(3,'${coachId}')">My Notes</button>
+      </div>
+      <div id="dct-content">
+        <!-- Progress Tracker Tab -->
+        <div id="dct-body-1">
+          <div class="grid-4" style="margin-bottom:14px">
+            <div class="metric-card"><div class="metric-label">Avg Q:I</div><div class="metric-value" style="color:${avgQI>=fw.qiTarget?'var(--lime)':'#fbbf24'}">${avgQI.toFixed(2)}</div><div class="metric-sub">Target ≥${fw.qiTarget}</div></div>
+            <div class="metric-card"><div class="metric-label">Avg P:C</div><div class="metric-value" style="color:${avgPC>=fw.pcTarget?'var(--lime)':'#fbbf24'}">${avgPC.toFixed(2)}</div><div class="metric-sub">Target ≥${fw.pcTarget}</div></div>
+            <div class="metric-card"><div class="metric-label">Sessions</div><div class="metric-value">${training.length}</div><div class="metric-sub">+ ${games.length} game days</div></div>
+            <div class="metric-card"><div class="metric-label">Avg High-Q</div><div class="metric-value">${avgHQ.toFixed(1)}</div><div class="metric-sub">Per session</div></div>
+          </div>
+
+          ${sorted.length>1?`<div class="card" style="margin-bottom:14px">
+            <div class="card-title">Q:I Ratio — Session by Session</div>
+            <div style="position:relative;height:180px"><canvas id="dcQ"></canvas></div>
+          </div>`:''}
+
+          <div class="card" style="margin-bottom:14px">
+            <div class="card-title">Session Grades</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0">
+              ${training.map(s=>`<div style="text-align:center">
+                <div class="grade ${Sessions.gradeClass(s.grade)}" style="width:36px;height:36px;font-size:14px">${s.grade||'—'}</div>
+                <div style="font-size:10px;color:var(--text-faint);margin-top:3px">${s.date?.slice(5)||''}</div>
+              </div>`).join('')}
+            </div>
+          </div>
+
+          ${topFocus.length?`<div class="card" style="margin-bottom:14px">
+            <div class="card-title">Top Development Areas — Most Frequent Focus</div>
+            ${topFocus.map(([area,count])=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+              <div style="flex:1;font-size:13px;font-weight:500">${area}</div>
+              <div style="display:flex;gap:3px">${Array.from({length:Math.min(count,8)},()=>`<div style="width:10px;height:20px;background:var(--lime);border-radius:2px;opacity:.8"></div>`).join('')}</div>
+              <span style="font-size:12px;color:var(--text-muted);min-width:30px">${count}x</span>
+            </div>`).join('')}
+          </div>`:''}
+
+          <div class="card">
+            <div class="card-title">Session History & Focus Areas</div>
+            ${!training.length?`<p style="font-size:13px;color:var(--text-muted)">No sessions uploaded yet.</p>`:''}
+            ${training.map(s=>{
+              let acts=[];try{acts=typeof s.actions==='string'&&s.actions.startsWith('[')?JSON.parse(s.actions):[];}catch(e){}
+              return`<div style="border:1px solid var(--border);border-radius:var(--radius-xs);padding:14px;margin-bottom:8px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:${acts.length||s.focus_area_1?'10px':'0'}">
+                  <div class="grade ${Sessions.gradeClass(s.grade)}" style="width:30px;height:30px;font-size:13px">${s.grade||'—'}</div>
+                  <div style="flex:1">
+                    <div style="font-size:13px;font-weight:600">${s.title||'Session'}</div>
+                    <div style="font-size:11px;color:var(--text-muted)">${s.date||''} · Q:I ${parseFloat(s.qi_ratio||0).toFixed(2)} · P:C ${parseFloat(s.pc_ratio||0).toFixed(2)}</div>
+                  </div>
+                </div>
+                ${acts.length?`<div style="background:var(--lime-pale);border-radius:var(--radius-xs);padding:10px 12px">
+                  ${acts.map(a=>`<div style="font-size:12px;margin-bottom:4px">→ <strong>${a.area||''}</strong> — ${a.action||''}</div>`).join('')}
+                </div>`:s.focus_area_1?`<div style="background:var(--lime-pale);border-radius:var(--radius-xs);padding:10px 12px">
+                  ${s.focus_area_1?`<div style="font-size:12px;margin-bottom:4px">→ ${s.focus_area_1}</div>`:''}
+                  ${s.focus_area_2?`<div style="font-size:12px">→ ${s.focus_area_2}</div>`:''}
+                </div>`:''}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Roadmap Tab (hidden by default) -->
+        <div id="dct-body-2" style="display:none">
+          <div class="card">
+            <div class="card-title">Roadmap Progress — ${roadmapDone.length} items completed</div>
+            <div class="prog-bar" style="margin-bottom:16px;height:10px"><div class="prog-fill" style="width:${roadmapDone.length>0?Math.min(100,Math.round(roadmapDone.length/20*100)):0}%"></div></div>
+            ${roadmapDone.length?roadmapDone.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+              <div style="width:20px;height:20px;border-radius:50%;background:var(--lime);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2" stroke="#14532d" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+              </div>
+              <span style="font-size:13px">${r.key?.split('-').slice(1).join(' ').replace(/-/g,' ')||r.key}</span>
+            </div>`).join(''):`<p style="font-size:13px;color:var(--text-muted)">No roadmap items completed yet.</p>`}
+          </div>
+
+          <div class="card" style="margin-top:14px">
+            <div class="card-title">Weekly Emails Sent</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0">
+              <!-- Email circles loaded separately -->
+              <p style="font-size:13px;color:var(--text-muted)">Email data loaded from coach profile.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes Tab (hidden by default) -->
+        <div id="dct-body-3" style="display:none">
+          <div class="card" style="margin-bottom:14px">
+            <div class="card-title">Log Contact / Observation</div>
+            <div class="form-group"><label class="label">Type</label>
+              <select id="nt-type" class="input">
+                <option value="observation">Session Observation</option>
+                <option value="meeting">Coach Meeting</option>
+                <option value="conversation">Conversation</option>
+                <option value="email">Email</option>
+                <option value="checkin">Check-in</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="label">Notes</label>
+              <textarea id="nt-notes" class="input" placeholder="What did you discuss? What did you observe? What are your recommendations?" style="min-height:100px"></textarea>
+            </div>
+            <div class="form-group"><label class="label">Upload Meeting Recording or Document (optional)</label>
+              <div class="upload-zone" onclick="$('nt-file').click()" style="padding:16px">
+                <div class="upload-icon" style="font-size:22px">📎</div>
+                <p style="font-size:12px">Click to attach a file</p>
+              </div>
+              <input type="file" id="nt-file" style="display:none" accept=".mp3,.m4a,.wav,.pdf,.docx,.txt">
+            </div>
+            <button class="btn btn-primary" onclick="Director.saveNote('${coachId}','${coach.first_name} ${coach.last_name}')">Save Contact Log</button>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Contact History — ${notes?.length||0} entries</div>
+            ${!notes?.length?`<div class="empty" style="padding:20px"><p>No contact logged yet. Use the form above to record observations, meetings and conversations.</p></div>`:''}
+            ${(notes||[]).map(n=>`<div style="border:1px solid var(--border);border-radius:var(--radius-xs);padding:14px;margin-bottom:8px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <span class="badge ${n.type==='observation'?'badge-lime':n.type==='meeting'?'badge-blue':n.type==='email'?'badge-amber':'badge-green'}">${n.type||'note'}</span>
+                <span style="font-size:12px;color:var(--text-muted)">${n.created_at?.slice(0,10)||''}</span>
+              </div>
+              <p style="font-size:13px;line-height:1.7;color:var(--text)">${n.notes||''}</p>
+              ${n.file_name?`<div style="margin-top:8px;font-size:12px;color:var(--lime)">📎 ${n.file_name}</div>`:''}
+            </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+    Director.setLayout('coaches', mainHtml);
+
+    setTimeout(()=>{
+      if(sorted.length>1){
+        const el=$('dcQ');if(!el)return;
+        const c=new Chart(el,{type:'line',data:{labels:sorted.map(s=>s.date?.slice(5)||''),datasets:[{data:sorted.map(s=>parseFloat(s.qi_ratio)||0),borderColor:'#84cc16',backgroundColor:'rgba(132,204,22,.1)',tension:.3,fill:true,pointRadius:5,pointBackgroundColor:'#84cc16'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},beginAtZero:true,suggestedMax:1.5}}}});
+        State.activeCharts.push(c);
+      }
+    },150);
+  },
+
+  coachTab(tab, coachId){
+    [1,2,3].forEach(t=>{
+      const btn=$(`dct-${t}`);const body=$(`dct-body-${t}`);
+      if(btn)btn.classList.toggle('active',t===tab);
+      if(body)body.style.display=t===tab?'block':'none';
+    });
+  },
+
+  async saveNote(coachId, coachName){
+    const type=$('nt-type')?.value||'note';
+    const notes=$('nt-notes')?.value?.trim()||'';
+    const file=$('nt-file')?.files?.[0];
+    if(!notes){alert('Please add some notes.');return;}
+    const row={director_id:State.profile.id,coach_id:coachId,coach_name:coachName,type,notes,file_name:file?.name||null,created_at:new Date().toISOString()};
+    const{error}=await sb.from('director_notes').insert(row);
+    if(error){alert('Error saving: '+error.message);return;}
+    Director.viewCoach(coachId);
+  },
+
+  // ── CULTURE UPLOAD TAB ─────────────────────────────────────────────────────
+  async renderCulture(){
+    State.currentSubSection='culture';
+    const{data:resources}=await sb.from('club_resources').select('*').eq('director_id',State.profile.id).order('created_at',{ascending:false});
+    const cats=['Club Values','Parent Meeting Template','Team Meeting Template','Individual Meeting Template','Evaluation Template','Weekly Email Template','Audio Upload Framework','Other'];
+
+    const mainHtml=`
+    <div class="page-header"><div><h1>Culture Upload</h1><p>Resources available to all coaches in your club</p></div></div>
+    <div class="page-body">
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Upload Club Resource</div>
+        <div class="form-group"><label class="label">Category</label>
+          <select id="res-cat" class="input">${cats.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+        </div>
+        <div class="form-group"><label class="label">Title</label>
+          <input type="text" id="res-title" class="input" placeholder="e.g. NCYSA Parent Meeting Template 2025">
+        </div>
+        <div class="form-group"><label class="label">Description (optional)</label>
+          <textarea id="res-desc" class="input" placeholder="Brief description of this resource..." style="min-height:60px"></textarea>
+        </div>
+        <div class="upload-zone" id="resZone" onclick="$('resFile').click()" style="margin-bottom:12px">
+          <div class="upload-icon">📁</div>
+          <p><strong>Click to upload</strong> a PDF, Word doc, or text file</p>
+          <p style="font-size:11px;color:var(--text-faint);margin-top:4px">.pdf · .docx · .txt · .mp3 · .m4a</p>
+        </div>
+        <input type="file" id="resFile" style="display:none" accept=".pdf,.docx,.txt,.mp3,.m4a,.wav" onchange="Director.handleResourceFile(this)">
+        <button class="btn btn-primary" onclick="Director.saveResource()">Upload Resource</button>
       </div>
 
-      ${sorted.length>1?`<div class="card" style="margin-bottom:14px">
-        <div class="card-title">Q:I Ratio Trend</div>
-        <div style="position:relative;height:160px"><canvas id="dirChartQ"></canvas></div>
-      </div>`:''}
+      <div class="card">
+        <div class="card-title">Club Resources — ${(resources||[]).length} uploaded</div>
+        ${!(resources||[]).length?`<div class="empty" style="padding:24px"><div class="empty-icon">📁</div><h3>No resources yet</h3><p>Upload templates and frameworks to make them available to all coaches in your club.</p></div>`:''}
+        ${cats.filter(cat=>(resources||[]).some(r=>r.category===cat)).map(cat=>`
+        <div style="margin-bottom:16px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">${cat}</div>
+          ${(resources||[]).filter(r=>r.category===cat).map(r=>`
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:20px">${r.file_name?.endsWith('.pdf')?'📄':r.file_name?.match(/\.(mp3|m4a|wav)$/)?'🎙️':'📝'}</span>
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:600">${r.title||r.file_name}</div>
+              ${r.description?`<div style="font-size:12px;color:var(--text-muted)">${r.description}</div>`:''}
+              <div style="font-size:11px;color:var(--text-faint)">${r.created_at?.slice(0,10)||''}</div>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="Director.deleteResource('${r.id}')">Remove</button>
+          </div>`).join('')}
+        </div>`).join('')}
+      </div>
+    </div>`;
+    Director.setLayout('culture', mainHtml);
+  },
+
+  handleResourceFile(input){
+    const file=input.files[0];if(!file)return;
+    const z=$('resZone');if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> ready to upload</p>`;
+    if(!$('res-title').value)$('res-title').value=file.name.replace(/\.[^.]+$/,'');
+  },
+
+  async saveResource(){
+    const cat=$('res-cat')?.value||'Other';
+    const title=$('res-title')?.value?.trim()||'';
+    const desc=$('res-desc')?.value?.trim()||'';
+    const file=$('resFile')?.files?.[0];
+    if(!title){alert('Please add a title.');return;}
+    const row={director_id:State.profile.id,category:cat,title,description:desc,file_name:file?.name||null,created_at:new Date().toISOString()};
+    const{error}=await sb.from('club_resources').insert(row);
+    if(error){alert('Error: '+error.message);return;}
+    Director.renderCulture();
+  },
+
+  async deleteResource(id){
+    await sb.from('club_resources').delete().eq('id',id);
+    Director.renderCulture();
+  },
+
+  // ── MY TASKS TAB ───────────────────────────────────────────────────────────
+  async renderTasks(){
+    State.currentSubSection='tasks';
+    const profile=State.profile;
+    const{data:tasks}=await sb.from('director_tasks').select('*').eq('director_id',profile.id).order('created_at',{ascending:false});
+    const{data:notes}=await sb.from('director_notes').select('coach_id,type,created_at').eq('director_id',profile.id);
+    const{data:coaches}=await sb.from('profiles').select('id,first_name,last_name').eq('club_id',(await sb.from('clubs').select('id').eq('director_id',profile.id).maybeSingle()).data?.id||'');
+
+    const taskTypes=['Email to Coach','Coach Meeting','Coach Observation','Check-in','Other'];
+    const pending=(tasks||[]).filter(t=>!t.done);
+    const done=(tasks||[]).filter(t=>t.done);
+
+    // Build observation heatmap
+    const observationMap={};
+    (coaches||[]).forEach(c=>{
+      const coachNotes=(notes||[]).filter(n=>n.coach_id===c.id);
+      const lastObs=coachNotes.filter(n=>n.type==='observation').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];
+      const lastContact=coachNotes.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];
+      observationMap[c.id]={
+        lastObs:lastObs?.created_at||null,
+        lastContact:lastContact?.created_at||null,
+        obsCount:coachNotes.filter(n=>n.type==='observation').length,
+        totalContact:coachNotes.length
+      };
+    });
+
+    const mainHtml=`
+    <div class="page-header"><div><h1>My Tasks</h1><p>${pending.length} pending · ${done.length} completed</p></div></div>
+    <div class="page-body">
 
       <div class="card" style="margin-bottom:14px">
-        <div class="card-title">Sessions & Focus Areas</div>
-        ${!trainingSessions.length?`<p style="font-size:13px;color:var(--text-muted)">No sessions uploaded yet.</p>`:''}
-        ${trainingSessions.map(s=>{
-          const acts=typeof s.actions==='string'&&s.actions.startsWith('[')?JSON.parse(s.actions):[];
-          return`<div style="border:1px solid var(--border);border-radius:var(--radius-xs);padding:14px;margin-bottom:8px">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-              <div class="grade ${Sessions.gradeClass(s.grade)}" style="width:30px;height:30px;font-size:13px">${s.grade||'—'}</div>
-              <div style="flex:1"><div style="font-size:13px;font-weight:600">${s.title||'Session'}</div><div style="font-size:11px;color:var(--text-muted)">${s.date||''} · ${s.age_group||''} · Q:I ${parseFloat(s.qi_ratio||0).toFixed(2)}</div></div>
+        <div class="card-title">Observation Heatmap — Who Needs Attention</div>
+        ${!(coaches||[]).length?`<p style="font-size:13px;color:var(--text-muted)">No coaches in your club yet.</p>`:''}
+        ${(coaches||[]).map(c=>{
+          const m=observationMap[c.id]||{};
+          const daysSinceObs=m.lastObs?Math.floor((new Date()-new Date(m.lastObs))/(1000*60*60*24)):999;
+          const daysSinceContact=m.lastContact?Math.floor((new Date()-new Date(m.lastContact))/(1000*60*60*24)):999;
+          return`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <div style="width:34px;height:34px;border-radius:50%;background:var(--dark);color:var(--lime);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">${c.first_name?.charAt(0)||'?'}</div>
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:600">${c.first_name} ${c.last_name}</div>
+              <div style="font-size:11px;color:var(--text-muted)">Last observation: ${daysSinceObs===999?'Never':daysSinceObs+'d ago'} · Last contact: ${daysSinceContact===999?'Never':daysSinceContact+'d ago'}</div>
             </div>
-            ${s.focus_area_1||s.focus_area_2||acts.length?`<div style="background:var(--lime-pale);border-radius:var(--radius-xs);padding:10px 12px">
-              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--dark);margin-bottom:6px">Focus Areas</div>
-              ${acts.length?acts.map(a=>`<div style="font-size:12px;margin-bottom:4px">→ <strong>${a.area||''}</strong> — ${a.action||''}</div>`).join(''):`${s.focus_area_1?`<div style="font-size:12px;margin-bottom:4px">→ ${s.focus_area_1}</div>`:''}${s.focus_area_2?`<div style="font-size:12px">→ ${s.focus_area_2}</div>`:''}`}
-            </div>`:''}
+            <div style="display:flex;gap:4px;align-items:center">
+              ${Array.from({length:Math.min(m.totalContact||0,8)},(_,i)=>`<div style="width:8px;height:24px;background:${i<(m.obsCount||0)?'var(--lime)':'#3b82f6'};border-radius:2px;opacity:.8"></div>`).join('')}
+              ${(m.totalContact||0)===0?`<span style="font-size:11px;color:var(--red);font-weight:600">No contact</span>`:''}
+            </div>
+            <span class="badge ${daysSinceContact<=7?'badge-green':daysSinceContact<=14?'badge-amber':'badge-red'}">${daysSinceContact===999?'Never':daysSinceContact<=0?'Today':daysSinceContact+'d'}</span>
           </div>`;
         }).join('')}
       </div>
 
-      ${gameDays.length?`<div class="card" style="margin-bottom:14px">
-        <div class="card-title">Game Day Reports</div>
-        ${gameDays.map(s=>`<div style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:var(--radius-xs);margin-bottom:6px">
-          <div class="grade ${Sessions.gradeClass(s.grade)}" style="width:28px;height:28px;font-size:12px">${s.grade||'—'}</div>
-          <div><div style="font-size:13px;font-weight:600">${s.title||'Game Report'}</div><div style="font-size:11px;color:var(--text-muted)">${s.date||''} · ${s.age_group||''}</div></div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Add Task</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-group"><label class="label">Type</label>
+            <select id="task-type" class="input">${taskTypes.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+          </div>
+          <div class="form-group"><label class="label">Coach (optional)</label>
+            <select id="task-coach" class="input"><option value="">All / General</option>${(coaches||[]).map(c=>`<option value="${c.first_name+' '+c.last_name}">${c.first_name} ${c.last_name}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="form-group"><label class="label">Task Description</label>
+          <input type="text" id="task-desc" class="input" placeholder="e.g. Observe training session — focus on questioning technique" onkeydown="if(event.key==='Enter')Director.addTask()">
+        </div>
+        <div class="form-group"><label class="label">Due Date (optional)</label>
+          <input type="date" id="task-due" class="input">
+        </div>
+        <button class="btn btn-primary" onclick="Director.addTask()">Add Task</button>
+      </div>
+
+      ${pending.length?`<div class="card" style="margin-bottom:14px">
+        <div class="card-title">Pending — ${pending.length}</div>
+        ${pending.map(t=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--border)">
+          <div onclick="Director.toggleTask('${t.id}',true)" style="width:20px;height:20px;border-radius:50%;border:2px solid var(--border-strong);cursor:pointer;flex-shrink:0;margin-top:2px"></div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:500">${t.description||''}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+              <span class="badge badge-blue" style="margin-right:6px">${t.task_type||'task'}</span>
+              ${t.coach_name?`<span style="margin-right:6px">→ ${t.coach_name}</span>`:''}
+              ${t.due_date?`<span>Due: ${t.due_date}</span>`:''}
+            </div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="Director.deleteTask('${t.id}')">✕</button>
         </div>`).join('')}
       </div>`:''}
 
-      <div class="card" style="margin-bottom:14px">
-        <div class="card-title">Roadmap Progress</div>
-        <div class="prog-bar" style="margin-bottom:10px;height:10px"><div class="prog-fill" style="width:${roadmapDone>0?Math.min(100,Math.round(roadmapDone/20*100)):0}%"></div></div>
-        <p style="font-size:13px;color:var(--text-muted)">${roadmapDone} roadmap items completed this season</p>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Weekly Emails</div>
-        <p style="font-size:13px;color:var(--text-muted)">${emailsSent} parent emails sent this season</p>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-          ${Array.from({length:12},(_,i)=>{
-            const wk=i+1;const e=(emails||[]).find(e=>e.week===wk);
-            return`<div style="width:36px;height:36px;border-radius:50%;border:2px solid ${e?.sent?'var(--lime)':'var(--border)'};background:${e?.sent?'var(--lime)':'transparent'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${e?.sent?'var(--dark-deep)':'var(--text-faint)'}">${wk}</div>`;
-          }).join('')}
-        </div>
-      </div>
-    </div>`);
-
-    if(sorted.length>1){
-      setTimeout(()=>{
-        const el=$('dirChartQ');if(!el)return;
-        const c=new Chart(el,{type:'line',data:{labels:sorted.map(s=>s.date?.slice(5)||''),datasets:[{data:sorted.map(s=>parseFloat(s.qi_ratio)||0),borderColor:'#84cc16',backgroundColor:'rgba(132,204,22,.1)',tension:.3,fill:true,pointRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},beginAtZero:true,suggestedMax:1.5}}}});
-        State.activeCharts.push(c);
-      },100);
-    }
+      ${done.length?`<div class="card">
+        <div class="card-title">Completed — ${done.length}</div>
+        ${done.slice(0,10).map(t=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);opacity:.6">
+          <div onclick="Director.toggleTask('${t.id}',false)" style="width:20px;height:20px;border-radius:50%;background:var(--lime);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+            <svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2" stroke="#14532d" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+          </div>
+          <div style="flex:1;font-size:13px;text-decoration:line-through;color:var(--text-muted)">${t.description||''}</div>
+        </div>`).join('')}
+      </div>`:''}
+    </div>`;
+    Director.setLayout('tasks', mainHtml);
   },
 
+  async addTask(){
+    const type=$('task-type')?.value||'Other';
+    const desc=$('task-desc')?.value?.trim()||'';
+    const coach=$('task-coach')?.value||'';
+    const due=$('task-due')?.value||null;
+    if(!desc){alert('Please describe the task.');return;}
+    await sb.from('director_tasks').insert({director_id:State.profile.id,task_type:type,description:desc,coach_name:coach||null,due_date:due,done:false});
+    Director.renderTasks();
+  },
+
+  async toggleTask(id,done){
+    await sb.from('director_tasks').update({done}).eq('id',id);
+    Director.renderTasks();
+  },
+
+  async deleteTask(id){
+    await sb.from('director_tasks').delete().eq('id',id);
+    Director.renderTasks();
+  },
+
+  // ── SETUP ──────────────────────────────────────────────────────────────────
   async renderSetup(){
     const profile=State.profile;
     const{data:existingClub}=await sb.from('clubs').select('*').eq('director_id',profile.id).maybeSingle();
+    const generateCode=()=>{const w=['UNITED','ELITE','ACADEMY','FORCE','ATHLETIC','YOUTH'];return w[Math.floor(Math.random()*w.length)]+(Math.floor(100+Math.random()*900));};
 
-    const generateCode=()=>{
-      const words=['UNITED','ELITE','ACADEMY','FORCE','ATHLETIC','FC','SC','YOUTH'];
-      const word=words[Math.floor(Math.random()*words.length)];
-      const num=Math.floor(100+Math.random()*900);
-      return `${word}${num}`;
-    };
-
-    setMain(`
-    <div class="page-header"><div><h1>${existingClub?'Club Settings':'Create Your Club'}</h1><p>${existingClub?'Manage your club and coaching staff':'Set up your director account to start managing coaches'}</p></div></div>
+    const mainHtml=`
+    <div class="page-header"><div><h1>${existingClub?'Club Settings':'Create Your Club'}</h1></div></div>
     <div class="page-body">
       <div class="card">
-        <div class="card-title">${existingClub?'Club Details':'Club Setup'}</div>
+        <div class="card-title">Club Details</div>
         <div class="form-group"><label class="label">Club Name</label><input type="text" id="club-name" class="input" placeholder="e.g. NCYSA North" value="${existingClub?.name||''}"></div>
-        <div class="form-group"><label class="label">Club Code <span style="font-size:11px;color:var(--text-muted)">— share this with your coaches so they can join</span></label>
+        <div class="form-group"><label class="label">Club Code — share with coaches on signup</label>
           <div style="display:flex;gap:8px">
             <input type="text" id="club-code" class="input" value="${existingClub?.code||generateCode()}" style="text-transform:uppercase;font-weight:700;letter-spacing:2px;font-size:16px">
-            ${!existingClub?`<button class="btn btn-sm btn-dark" onclick="$('club-code').value='${generateCode()}'">Regenerate</button>`:''}
+            ${!existingClub?`<button class="btn btn-sm btn-dark" onclick="$('club-code').value='${generateCode()}'">New Code</button>`:''}
           </div>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:6px">Coaches enter this code when they sign up to automatically join your club</p>
         </div>
         <button class="btn btn-primary" onclick="Director.saveClub('${existingClub?.id||''}')">${existingClub?'Save Changes':'Create Club'}</button>
       </div>
-      ${existingClub?`<div class="alert alert-success" style="margin-top:14px">Your club code is <strong style="letter-spacing:1px">${existingClub.code}</strong> — share this with coaches when they sign up.</div>`:''}
       <div class="card" style="margin-top:14px">
         <div class="card-title">Your Role</div>
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">If you also coach a team, set your role to "Both" to access the coach dashboard alongside the director dashboard.</p>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">If you also coach a team, set your role to Both to access both dashboards.</p>
         <div style="display:flex;gap:8px">
           <button class="btn ${profile.role==='director'?'btn-primary':''}" onclick="Director.setRole('director')">Director Only</button>
           <button class="btn ${profile.role==='both'?'btn-primary':''}" onclick="Director.setRole('both')">Both — Coach & Director</button>
         </div>
       </div>
-    </div>`);
+    </div>`;
+    Director.setLayout('coaches', mainHtml);
   },
 
   async saveClub(existingId){
     const name=$('club-name')?.value?.trim();
     const code=($('club-code')?.value?.trim()||'').toUpperCase();
-    if(!name||!code){alert('Please enter a club name and code.');return}
+    if(!name||!code){alert('Please enter a club name and code.');return;}
     if(existingId){
       await sb.from('clubs').update({name,code}).eq('id',existingId);
-      alert('Club updated successfully.');
     } else {
       const{data,error}=await sb.from('clubs').insert({director_id:State.profile.id,name,code}).select().single();
-      if(error){alert('Error creating club: '+error.message);return}
+      if(error){alert('Error: '+error.message);return;}
       await sb.from('profiles').update({club_id:data.id}).eq('id',State.profile.id);
-      alert(`Club created! Share the code "${code}" with your coaches.`);
     }
-    Director.renderOverview();
+    Director.renderCoaches();
   },
 
   async setRole(role){
@@ -2393,7 +2687,6 @@ const Director={
     const rs=$('roleSwitcher');
     if(role==='both'){if(rs)rs.style.display='flex';}
     else{if(rs)rs.style.display='none';}
-    alert(`Role updated to: ${role==='both'?'Coach & Director':'Director Only'}`);
     Director.renderSetup();
   }
 };
