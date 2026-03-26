@@ -397,6 +397,8 @@ textarea.input{resize:vertical;min-height:80px;line-height:1.6;}
 <script>
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
 const SB_URL='https://bbzxpeplwufkmaqswyks.supabase.co';
+const ANTHROPIC_KEY='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';
+const OPENAI_KEY='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';
 const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJienhwZXBsd3Vma21hcXN3eWtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NzMxOTMsImV4cCI6MjA4OTQ0OTE5M30.n9o9buBrpgjNALKC3LeZnbpSjzf-j47hxXp32Ft3WYM';
 const sb=supabase.createClient(SB_URL,SB_ANON);
 
@@ -763,7 +765,7 @@ const Sessions={
           <p style="font-size:13px;color:var(--text-muted)"><strong>Click to upload</strong> or drag and drop</p>
           <p style="font-size:11px;color:var(--text-faint);margin-top:4px">.mp3 · .m4a · .wav · .txt · .docx</p>
         </div>
-        <input type="file" id="nsFile" style="display:none" accept=".mp3,.m4a,.wav,.txt,.docx" onchange="Sessions.handleFile(this)">
+        <input type="file" id="nsFile" style="display:none" accept=".mp3,.m4a,.wav,.mp4,.txt,.docx" onchange="Sessions.handleFile(this)">
         <div style="text-align:center;padding:10px 0;color:var(--text-faint);font-size:12px">— or paste transcript below —</div>
         <textarea id="ns-transcript" class="input" placeholder="Paste your session transcript here..." style="min-height:150px"></textarea>
       </div>
@@ -779,23 +781,57 @@ const Sessions={
 
   handleFile(input){
     const file=input.files[0];if(!file)return;
-    if(file.name.endsWith('.txt')){
+    const z=$('nsZone');
+    if(file.name.match(/\.txt$/i)){
       const r=new FileReader();
       r.onload=e=>{const el=$('ns-transcript');if(el)el.value=e.target.result;};
       r.readAsText(file);
+      if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> ready</p>`;
+    } else if(file.name.match(/\.(mp3|m4a|wav|mp4|webm|ogg|aac)$/i)){
+      if(z)z.innerHTML=`<div class="upload-icon">⏳</div><p><strong>Transcribing audio…</strong><br>This takes about 20-40 seconds. Please wait.</p>`;
+      Sessions.transcribeAudio(file).then(transcript=>{
+        if(transcript){
+          const el=$('ns-transcript');if(el)el.value=transcript;
+          if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> transcribed successfully.<br>Review the text below then click Analyse.</p>`;
+        } else {
+          if(z)z.innerHTML=`<div class="upload-icon">❌</div><p>Transcription failed. Please paste your transcript manually below.</p>`;
+        }
+      });
+    } else {
+      if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> selected</p>`;
     }
-    const z=$('nsZone');if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> ready</p>`;
+  },
+
+  async transcribeAudio(file){
+    try{
+      const formData=new FormData();
+      formData.append('file', file, file.name);
+      formData.append('model','whisper-1');
+      formData.append('response_format','text');
+      const resp=await fetch('https://api.openai.com/v1/audio/transcriptions',{
+        method:'POST',
+        headers:{'Authorization':`Bearer ${OPENAI_KEY}`},
+        body:formData
+      });
+      if(!resp.ok){
+        const err=await resp.text();
+        console.error('Whisper error:',resp.status,err);
+        return null;
+      }
+      const text=await resp.text();
+      return text;
+    }catch(e){
+      console.error('Transcription error:',e);
+      return null;
+    }
   },
 
   handleDrop(e){
     e.preventDefault();
     const file=e.dataTransfer.files[0];if(!file)return;
-    if(file.name.endsWith('.txt')){
-      const r=new FileReader();
-      r.onload=ev=>{const el=$('ns-transcript');if(el)el.value=ev.target.result;};
-      r.readAsText(file);
-    }
-    const z=$('nsZone');if(z){z.classList.remove('drag');z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> ready</p>`;}
+    const z=$('nsZone');if(z)z.classList.remove('drag');
+    const fakeInput={files:[file]};
+    Sessions.handleFile(fakeInput);
   },
 
   async analyse(){
@@ -862,7 +898,7 @@ const Sessions={
       const prompt=Framework.buildAIPrompt(transcript,title,ag,metrics,isGameDay);
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01'},
+        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:prompt}]})
       });
       if(!resp.ok)return Sessions.basicFeedback(metrics,ag);
@@ -1096,7 +1132,7 @@ const GameDay={
           <div class="upload-icon">🎙️</div>
           <p style="font-size:13px;color:var(--text-muted)"><strong>Upload</strong> sideline audio or notes file</p>
         </div>
-        <input type="file" id="gdFile" style="display:none" accept=".mp3,.m4a,.wav,.txt" onchange="GameDay.handleFile(this)">
+        <input type="file" id="gdFile" style="display:none" accept=".mp3,.m4a,.wav,.aac,.mp4,.txt" onchange="GameDay.handleFile(this)">
         <div style="text-align:center;padding:10px 0;color:var(--text-faint);font-size:12px">— or use the structured form below —</div>
       </div>
 
@@ -1144,12 +1180,23 @@ const GameDay={
 
   handleFile(input){
     const file=input.files[0];if(!file)return;
-    if(file.name.endsWith('.txt')){
+    const z=$('gdZone');
+    if(file.name.match(/\.txt$/i)){
       const r=new FileReader();
       r.onload=e=>{const el=$('gd-attacking');if(el)el.value=e.target.result;};
       r.readAsText(file);
+      if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> ready</p>`;
+    } else if(file.name.match(/\.(mp3|m4a|wav|mp4|webm|ogg|aac)$/i)){
+      if(z)z.innerHTML=`<div class="upload-icon">⏳</div><p><strong>Transcribing audio…</strong> About 30 seconds.</p>`;
+      Sessions.transcribeAudio(file).then(transcript=>{
+        if(transcript){
+          const el=$('gd-attacking');if(el)el.value=transcript;
+          if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> transcribed. Review and click Analyse.</p>`;
+        } else {
+          if(z)z.innerHTML=`<div class="upload-icon">❌</div><p>Transcription failed. Please paste notes manually.</p>`;
+        }
+      });
     }
-    const z=$('gdZone');if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> ready</p>`;
   },
 
   async save(){
