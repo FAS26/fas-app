@@ -651,41 +651,63 @@ const App={
     }
     State.profile=profile;
     await App.loadData();
-    // Show director nav and role switcher if applicable
-    const isDirector=State.profile?.role==='director'||State.profile?.role==='both';
-    const isCoach=State.profile?.role==='coach'||State.profile?.role==='both';
-    const dirNav=$('nav-director');const mobDir=$('mob-director');
+
+    const role=State.profile?.role||'coach';
+    const isDirector=role==='director'||role==='both';
+    const isCoach=role==='coach'||role==='both';
+
+    // Always show coach nav for coaches
+    // Show director nav for directors
+    const dirNav=$('nav-director');
+    const mobDir=$('mob-director');
     if(isDirector){
       if(dirNav)dirNav.style.display='flex';
       if(mobDir)mobDir.style.display='flex';
     }
-    // Show role switcher if user has both roles
-    if(isDirector&&isCoach||State.profile?.role==='both'){
+
+    // Show role switcher only if both roles
+    if(role==='both'){
       const rs=$('roleSwitcher');if(rs)rs.style.display='flex';
     }
-    State.currentView=isDirector&&!isCoach?'director':'coach';
+
+    // Hide coach nav items for director-only accounts
+    if(isDirector&&!isCoach){
+      ['nav-sessions','nav-gameday','nav-team','nav-community','nav-resources',
+       'mob-sessions','mob-gameday','mob-team','mob-resources'].forEach(id=>{
+        const el=$(id);if(el)el.style.display='none';
+      });
+    }
+
     $('loadingState').style.display='none';
-    if(State.currentView==='director'&&!isCoach) Nav.go('director');
-    else Nav.go('sessions');
+
+    // Route to correct starting view
+    if(isDirector&&!isCoach){
+      Nav.go('director');
+    } else {
+      Nav.go('sessions');
+    }
   },
 
   switchView(view){
     State.currentView=view;
-    const coachBtns=['nav-sessions','nav-gameday','nav-team','nav-journey','mob-sessions','mob-gameday','mob-team','mob-journey'];
-    const dirBtns=['nav-director','mob-director'];
+    const coachOnly=['nav-sessions','nav-gameday','nav-team','nav-community','nav-resources',
+                     'mob-sessions','mob-gameday','mob-team','mob-resources'];
     if(view==='director'){
-      coachBtns.forEach(id=>{const el=$(id);if(el)el.style.display='none'});
-      dirBtns.forEach(id=>{const el=$(id);if(el)el.style.display='flex'});
-      // Keep journey/bamboo visible for director's own use
+      // Hide coach-only nav, keep journey for director personal use
+      coachOnly.forEach(id=>{const el=$(id);if(el)el.style.display='none'});
       const jn=$('nav-journey');if(jn)jn.style.display='flex';
       const mj=$('mob-journey');if(mj)mj.style.display='flex';
-      $('coachViewBtn')?.classList.remove('active');
-      $('directorViewBtn')?.classList.add('active');
+      const dn=$('nav-director');if(dn)dn.style.display='flex';
+      // Update button styles
+      $('coachViewBtn')?.classList.remove('btn-primary');
+      $('directorViewBtn')?.classList.add('btn-primary');
       Nav.go('director');
     } else {
-      coachBtns.forEach(id=>{const el=$(id);if(el)el.style.display='flex'});
-      $('coachViewBtn')?.classList.add('active');
-      $('directorViewBtn')?.classList.remove('active');
+      // Show all coach nav
+      coachOnly.forEach(id=>{const el=$(id);if(el)el.style.display='flex'});
+      const jn=$('nav-journey');if(jn)jn.style.display='flex';
+      $('coachViewBtn')?.classList.add('btn-primary');
+      $('directorViewBtn')?.classList.remove('btn-primary');
       Nav.go('sessions');
     }
   },
