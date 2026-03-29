@@ -1353,22 +1353,107 @@ const Team={
     const done=PHASES.reduce((a,p)=>a+p.items.filter(it=>checked[`${p.id}-${it.id}`]?.checked).length,0);
     const pv=Math.round((done/total)*100);
 
+    // Season start date logic
+    const startDateStr=State.settings.seasonStartDate||'';
+    const startDate=startDateStr?new Date(startDateStr):null;
+    const today=new Date();
+    const weekNum=startDate?Math.max(1,Math.ceil((today-startDate)/(1000*60*60*24*7))):null;
+
+    // Determine current phase based on week
+    // pre=before week 1, early=weeks 1-4, mid=weeks 5-9, late=weeks 10-12, end=week 13+
+    const getPhaseStatus=(phaseId)=>{
+      if(!weekNum) return 'active'; // No date set — show all
+      if(phaseId==='pre') return weekNum<=0?'active':'past';
+      if(phaseId==='early') return weekNum>=1&&weekNum<=4?'active':weekNum<1?'future':'past';
+      if(phaseId==='mid') return weekNum>=5&&weekNum<=9?'active':weekNum<5?'future':'past';
+      if(phaseId==='late') return weekNum>=10&&weekNum<=12?'active':weekNum<10?'future':'past';
+      if(phaseId==='end') return weekNum>=13?'active':weekNum<13?'future':'past';
+      return 'active';
+    };
+
+    // This week's priority task — first unchecked essential item in current phase
+    let thisWeekTask=null;
+    if(weekNum){
+      for(const phase of PHASES){
+        if(getPhaseStatus(phase.id)==='active'){
+          const unchecked=phase.items.filter(it=>!checked[`${phase.id}-${it.id}`]?.checked&&it.pri==='essential');
+          if(unchecked.length){thisWeekTask={phase,item:unchecked[0]};break;}
+        }
+      }
+    }
+
     setMain(`
-    <div class="page-header"><div><h1>Season Roadmap</h1><p>${done}/${total} complete · ${pv}%</p></div></div>
+    <div class="page-header">
+      <div><h1>Season Roadmap</h1><p>${done}/${total} complete · ${pv}%</p></div>
+      <button class="btn btn-sm btn-dark" onclick="Team.setSeasonDate()">📅 ${startDateStr?'Season started: '+startDateStr:'Set Season Start Date'}</button>
+    </div>
     <div class="page-body">
       <div class="prog-bar" style="margin-bottom:18px;height:9px"><div class="prog-fill" style="width:${pv}%"></div></div>
+
+      ${!startDateStr?`<div class="alert alert-info" style="margin-bottom:16px">
+        <strong>Set your season start date</strong> to unlock a week-by-week view. The roadmap will show you exactly what to focus on each week — and keep future tasks out of the way until you need them.
+        <button class="btn btn-primary btn-sm" style="margin-top:10px;display:block" onclick="Team.setSeasonDate()">Set Start Date →</button>
+      </div>`:`<div class="alert alert-success" style="margin-bottom:16px">
+        Season Week ${weekNum} of 13 · ${startDateStr?'Started: '+startDateStr:''}
+      </div>`}
+
+      ${thisWeekTask?`<div style="background:var(--dark);border:2px solid var(--lime);border-radius:var(--radius);padding:18px;margin-bottom:20px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--lime);margin-bottom:10px">🎯 THIS WEEK — Priority Task</div>
+        <div style="font-size:15px;font-weight:700;color:var(--white);margin-bottom:6px">${thisWeekTask.item.title}</div>
+        <div style="font-size:12px;color:var(--lime-muted);line-height:1.6;margin-bottom:12px">${thisWeekTask.item.desc}</div>
+        ${thisWeekTask.item.prompt?`<details><summary style="cursor:pointer;font-size:12px;color:var(--lime);font-weight:600;list-style:none">▸ Open facilitation guide</summary><div style="margin-top:10px;background:#0a2a0a;border-radius:var(--radius-xs);padding:12px 14px;font-size:12px;line-height:1.7;white-space:pre-line;color:#dcfce7">${thisWeekTask.item.prompt}</div></details>`:''}
+        <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="Team.toggleRoadmap('${thisWeekTask.phase.id}-${thisWeekTask.item.id}')">Mark Complete ✓</button>
+      </div>`:''}
+
       ${PHASES.map(phase=>{
         const pd=phase.items.filter(it=>checked[`${phase.id}-${it.id}`]?.checked).length;
         const allDone=pd===phase.items.length;
+        const status=getPhaseStatus(phase.id);
+        const isActive=status==='active';
+        const isFuture=status==='future'&&startDateStr;
+        const isPast=status==='past'&&startDateStr;
+
+        if(isFuture){
+          // Future phases — collapsed, locked
+          const weeksUntil=phase.id==='early'?Math.max(0,1-weekNum):phase.id==='mid'?Math.max(0,5-weekNum):phase.id==='late'?Math.max(0,10-weekNum):Math.max(0,13-weekNum);
+          return`<div style="margin-bottom:12px;opacity:.55">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--dark);border-radius:var(--radius-xs)">
+              <div style="font-size:18px">${phase.icon}</div>
+              <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--white)">${phase.label}</div><div style="font-size:11px;color:var(--lime-muted)">${phase.timing}</div></div>
+              <span style="font-size:11px;color:#6b7280">🔒 Opens in ${weeksUntil} week${weeksUntil!==1?'s':''}</span>
+            </div>
+          </div>`;
+        }
+
+        if(isPast){
+          // Past phases — summary only
+          return`<div style="margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--dark);border-radius:var(--radius-xs);margin-bottom:6px">
+              <div style="font-size:18px">${phase.icon}</div>
+              <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--white)">${phase.label}</div><div style="font-size:11px;color:var(--lime-muted)">${pd}/${phase.items.length} complete</div></div>
+              <span style="font-size:11px;font-weight:600;color:${allDone?'var(--lime)':'#fbbf24'}">${allDone?'✓ Done':'In progress'}</span>
+            </div>
+            ${!allDone?`<div style="padding:0 4px">${phase.items.filter(it=>!checked[`${phase.id}-${it.id}`]?.checked).map(item=>{
+              const key=`${phase.id}-${item.id}`;
+              return`<div class="roadmap-item">
+                <div class="check-circle" onclick="Team.toggleRoadmap('${key}')"></div>
+                <div style="flex:1"><div style="font-size:13px;font-weight:600">${item.title}</div><div style="font-size:11px;color:var(--text-muted)">${item.cat}</div></div>
+              </div>`;
+            }).join('')}</div>`:''}
+          </div>`;
+        }
+
+        // Active phase — full detail
         return`<div style="margin-bottom:22px">
-          <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--dark);border-radius:var(--radius-xs);margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--dark);border:1px solid var(--lime);border-radius:var(--radius-xs);margin-bottom:10px">
             <div style="font-size:18px">${phase.icon}</div>
-            <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--white)">${phase.label}</div><div style="font-size:11px;color:var(--lime-muted)">${phase.timing} · ${pd}/${phase.items.length}</div></div>
+            <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--lime)">${phase.label} ${isActive&&startDateStr?'— Current Phase':''}</div><div style="font-size:11px;color:var(--lime-muted)">${phase.timing} · ${pd}/${phase.items.length}</div></div>
             <span style="font-size:11px;font-weight:600;color:${allDone?'var(--lime)':pd>0?'#fbbf24':'#6b7280'}">${allDone?'✓ Complete':pd>0?'In progress':'Not started'}</span>
           </div>
           ${phase.items.map(item=>{
             const key=`${phase.id}-${item.id}`,isChecked=!!checked[key]?.checked;
-            return`<div class="roadmap-item ${isChecked?'checked':''}">
+            const isThisWeek=thisWeekTask?.item.id===item.id&&thisWeekTask?.phase.id===phase.id;
+            return`<div class="roadmap-item ${isChecked?'checked':''}" style="${isThisWeek?'display:none':''}">
               <div class="check-circle ${isChecked?'checked':''}" onclick="Team.toggleRoadmap('${key}')">
                 ${isChecked?'<svg width="9" height="9" viewBox="0 0 9 9"><polyline points="1.5,4.5 3.5,6.5 7.5,2" stroke="#14532d" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
               </div>
@@ -1379,13 +1464,26 @@ const Team={
                 </div>
                 <div style="font-size:13px;font-weight:600;margin-bottom:3px;${isChecked?'text-decoration:line-through;color:var(--text-muted)':''}">${item.title}</div>
                 <div style="font-size:12px;color:var(--text-muted);line-height:1.5">${item.desc}</div>
-                ${item.prompt?`<details style="margin-top:7px"><summary style="cursor:pointer;font-size:12px;color:var(--dark);font-weight:600;list-style:none;display:flex;align-items:center;gap:4px"><span>▸</span> Facilitation guide & prompts</summary><div style="margin-top:7px;background:var(--lime-pale);border:1px solid var(--border);border-radius:var(--radius-xs);padding:11px 13px;font-size:12px;line-height:1.65;white-space:pre-line;color:var(--text)">${item.prompt}</div></details>`:''}
+                ${!isChecked&&item.prompt?`<details style="margin-top:7px"><summary style="cursor:pointer;font-size:12px;color:var(--dark);font-weight:600;list-style:none;display:flex;align-items:center;gap:4px"><span>▸</span> Facilitation guide & prompts</summary><div style="margin-top:7px;background:var(--lime-pale);border:1px solid var(--border);border-radius:var(--radius-xs);padding:11px 13px;font-size:12px;line-height:1.65;white-space:pre-line;color:var(--text)">${item.prompt}</div></details>`:''}
               </div>
             </div>`;
           }).join('')}
         </div>`;
       }).join('')}
     </div>`);
+  },
+
+  setSeasonDate(){
+    const current=State.settings.seasonStartDate||'';
+    const date=prompt('Enter your season start date (YYYY-MM-DD):',current||new Date().toISOString().slice(0,10));
+    if(!date)return;
+    Team.saveSeasonDate(date);
+  },
+
+  async saveSeasonDate(date){
+    State.settings.seasonStartDate=date;
+    await sb.from('settings').upsert({user_id:State.user.id,key:'seasonStartDate',value:date},{onConflict:'user_id,key'});
+    Team.renderRoadmap();
   },
 
   getPhases(){
