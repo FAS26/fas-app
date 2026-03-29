@@ -2234,6 +2234,229 @@ ${name}`;
       ${acts.map(a=>`<div style="border:1px solid var(--border);border-radius:var(--radius-xs);padding:12px;margin-bottom:8px"><div style="font-size:14px;font-weight:600;color:var(--dark);margin-bottom:4px">${a.name}</div><p style="font-size:13px;color:var(--text-muted);line-height:1.6">${a.desc}</p></div>`).join('')}
     </div>`;
   },
+  async toggleRoadmap(key){
+    const nv=!(State.roadmap[key]?.checked);
+    State.roadmap[key]={checked:nv,notes:''};
+    await sb.from('roadmap').upsert({user_id:State.user.id,coach_name:coachName(),key,checked:nv},{onConflict:'user_id,key'});
+    Team.renderRoadmap();
+  },
+
+  togglePhaseIfNeeded(id,show){
+    const el=document.getElementById(id);
+    if(el&&show)el.style.display='block';
+  },
+
+  async saveSeasonDate(date){
+    State.settings.seasonStartDate=date;
+    await sb.from('settings').upsert({user_id:State.user.id,key:'seasonStartDate',value:date},{onConflict:'user_id,key'});
+    Team.renderRoadmap();
+  },
+
+  async markSent(wk){
+    State.weeklyEmails[wk]={...State.weeklyEmails[wk],sent:true};
+    await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,sent:true},{onConflict:'user_id,week'});
+    Team.renderEmails();
+  },
+
+  async saveEmailBody(wk){
+    const el=document.getElementById('et-body-'+wk);
+    const body=el?.value||'';
+    State.weeklyEmails[wk]={...State.weeklyEmails[wk],body};
+    await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,body},{onConflict:'user_id,week'});
+  },
+
+  copyEmail(wk){
+    const el=document.getElementById('et-body-'+wk);
+    if(!el)return;
+    navigator.clipboard.writeText(el.value||'').then(()=>{
+      alert('Email copied to clipboard!');
+    }).catch(()=>{
+      el.select();document.execCommand('copy');alert('Email copied!');
+    });
+  },
+
+  async generateEmailAI(wk){
+    const isGame=(State.weeklyEmails[wk]?.email_type==='pregame');
+    const context=(document.getElementById('wctx-'+wk)?.value||'').trim();
+    const schedule=(document.getElementById('wsc-'+wk)?.value||'').trim();
+    const ep=document.getElementById('ep-'+wk);
+    const eb=document.getElementById('et-body-'+wk);
+    if(ep)ep.style.display='block';
+    if(eb){eb.value='Generating email from your sessions…';eb.style.opacity='0.5';}
+
+    const startDateStr=State.settings.seasonStartDate||'';
+    const startDate=startDateStr?new Date(startDateStr):null;
+    let weekSessions=[];
+    if(startDate){
+      const wkStart=new Date(startDate);wkStart.setDate(wkStart.getDate()+(wk-1)*7);
+      const wkEnd=new Date(wkStart);wkEnd.setDate(wkEnd.getDate()+6);
+      weekSessions=State.sessions.filter(s=>{const d=new Date(s.date||s.created_at);return d>=wkStart&&d<=wkEnd;});
+    }
+    if(!weekSessions.length)weekSessions=State.sessions.slice(0,2);
+
+    const training=weekSessions.filter(s=>s.session_objective!=='Game Day'&&!s.session_objective?.startsWith('GAMEDAY'));
+    const games=weekSessions.filter(s=>s.session_objective==='Game Day'||s.session_objective?.startsWith('GAMEDAY'));
+    const prevEmails=Object.values(State.weeklyEmails).filter(e=>e.body&&e.week<wk).slice(-3);
+    const styleExamples=prevEmails.map(e=>e.body).join('
+
+---
+
+');
+    const name=coachName();
+
+    const sessionSummaries=training.map(s=>'Training: "'+s.title+'" ('+s.date+')
+Focus: '+(s.focus_area_1||'')+', '+(s.focus_area_2||'')+'
+What went well: '+(s.encouragement||'')).join('
+
+');
+    const gameSummaries=games.map(s=>'Game: "'+s.title+'" ('+s.date+')
+What went well: '+(s.encouragement||'')+'
+Focus: '+(s.focus_area_1||'')).join('
+
+');
+    const vals=State.values.length?'Team values: '+State.values.join(', '):'';
+
+    const prompt='You are writing a parent email for '+name+', a football/soccer coach.
+
+'
+      +'EMAIL TYPE: '+(isGame?'Pre-Game email — what parents should look for on match day':'Monday email — looking back at the game, looking forward to training this week')+'
+
+'
+      +(sessionSummaries?'TRAINING THIS WEEK:
+'+sessionSummaries+'
+
+':'')
+      +(gameSummaries?'GAME REPORT:
+'+gameSummaries+'
+
+':'')
+      +(vals?vals+'
+':'')
+      +(schedule?'Logistics: '+schedule+'
+':'')
+      +(context?'Extra context: '+context+'
+':'')
+      +(styleExamples?'
+PREVIOUS EMAILS — match this writing style:
+'+styleExamples+'
+
+':'')
+      +'RULES:
+'
+      +'1. Write in flowing paragraphs — NO headers, NO bullet points, NO all-caps titles
+'
+      +'2. Warm and conversational — like a genuine letter
+'
+      +'3. Development-focused — never just about the result
+'
+      +'4. Normalise mistakes — they are part of the process
+'
+      +'5. Weave in sideline guidance naturally — encourage without directing
+'
+      +'6. Start with "Hi everyone,"
+'
+      +'7. End with "Thank you for all that you do!" and "'+name+'"
+'
+      +'8. Maximum 3 paragraphs
+'
+      +'9. '+(isGame?'Tell parents what to look for and remind them to encourage without directing.':'Look back at game Saturday then look forward to training this week.')+'
+
+'
+      +'Write ONLY the email text.';
+
+    try{
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]})
+      });
+      let body='';
+      if(resp.ok){const data=await resp.json();body=data.content[0].text.trim();}
+      else body=Team.fallbackEmail(isGame,training,games,schedule,context,name);
+      if(eb){eb.value=body;eb.style.opacity='1';}
+      State.weeklyEmails[wk]={...State.weeklyEmails[wk],body,email_type:isGame?'pregame':'monday'};
+      await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,body,email_type:isGame?'pregame':'monday'},{onConflict:'user_id,week'});
+    }catch(err){
+      const body=Team.fallbackEmail(isGame,training,games,schedule,context,name);
+      if(eb){eb.value=body;eb.style.opacity='1';}
+    }
+  },
+
+  async saveCheckin(pn){
+    const notes=document.getElementById('ci-'+pn)?.value?.trim();
+    if(!notes)return;
+    const row={user_id:State.user.id,coach_name:coachName(),player_name:pn,notes,date:new Date().toISOString().slice(0,10)};
+    const{data}=await sb.from('player_checkins').insert(row).select().single();
+    if(data)State.checkins.unshift(data);
+    Team.renderPlayers();
+  },
+
+  async saveInteraction(){
+    const player=document.getElementById('li-player').value;
+    const type=document.getElementById('li-type').value;
+    const note=document.getElementById('li-note').value.trim();
+    if(!player)return;
+    const row={user_id:State.user.id,coach_name:coachName(),player_name:player,type,note,date:new Date().toISOString().slice(0,10),source:'manual'};
+    const{data}=await sb.from('interactions').insert(row).select().single();
+    if(data)State.interactions.push(data);
+    closeModal('logInteractionModal');
+    Team.renderPlayers();
+  },
+
+  async addPlayer(){
+    const name=document.getElementById('ap-name')?.value?.trim();
+    const num=document.getElementById('ap-num')?.value?.trim();
+    const pos=document.getElementById('ap-pos')?.value?.trim();
+    if(!name)return;
+    const{data}=await sb.from('roster').insert({user_id:State.user.id,coach_name:coachName(),name,number:num||'',position:pos||''}).select().single();
+    if(data)State.roster.push(data);
+    closeModal('addPlayerModal');
+    Team.renderRoster();Team.rTab('roster');
+  },
+
+  async deletePlayer(id){
+    await sb.from('roster').delete().eq('id',id);
+    State.roster=State.roster.filter(p=>p.id!==id);
+    Team.renderRoster();Team.rTab('roster');
+  },
+
+  async addValue(){
+    const el=document.getElementById('newVal');
+    const v=el?.value?.trim();
+    if(!v)return;
+    State.values.push(v);el.value='';
+    await sb.from('team_values').upsert({user_id:State.user.id,coach_name:coachName(),value:v},{onConflict:'user_id,value'});
+    Team.renderRoster();Team.rTab('values');
+  },
+
+  async deleteValue(val){
+    State.values=State.values.filter(v=>v!==val);
+    await sb.from('team_values').delete().eq('user_id',State.user.id).eq('value',val);
+    Team.renderRoster();Team.rTab('values');
+  },
+
+  async saveStandard(val){
+    const std=document.getElementById('std-'+val)?.value?.trim()||'';
+    const film=document.getElementById('film-'+val)?.value?.trim()||'';
+    State.settings['std-'+val]=std;
+    State.settings['film-'+val]=film;
+    await Promise.all([
+      sb.from('settings').upsert({user_id:State.user.id,key:'std-'+val,value:std},{onConflict:'user_id,key'}),
+      sb.from('settings').upsert({user_id:State.user.id,key:'film-'+val,value:film},{onConflict:'user_id,key'}),
+    ]);
+    alert('Standards saved for: '+val);
+  },
+
+  async addTopic(){
+    const el=document.getElementById('newTopic');
+    const t=el?.value?.trim();
+    if(!t)return;
+    const{data}=await sb.from('season_topics').insert({user_id:State.user.id,coach_name:coachName(),topic:t}).select().single();
+    if(data)State.seasonTopics.push(data);
+    el.value='';
+    Team.renderRoster();Team.rTab('topics');
+  },
+
 };
 </script>
 
