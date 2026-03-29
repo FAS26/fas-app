@@ -364,7 +364,7 @@ textarea.input{resize:vertical;min-height:80px;line-height:1.6;}
       <div class="loading" id="loadingState"><div class="spinner"></div><p style="font-size:13px;color:var(--text-muted)">Loading FAS…</p></div>
     </main>
   </div>
-  <nav class="mobile-nav">
+  <nav class="mobile-nav" id="mobileBottomNav">
     <div class="mobile-nav-inner">
       <div class="mobile-tab active" id="mob-sessions" onclick="Nav.go('sessions')"><span class="mobile-tab-icon">📋</span><span class="mobile-tab-label">Sessions</span></div>
       <div class="mobile-tab" id="mob-gameday" onclick="Nav.go('gameday')"><span class="mobile-tab-icon">🏆</span><span class="mobile-tab-label">Game Day</span></div>
@@ -658,15 +658,16 @@ const App={
     // Show/hide nav based on role
     // Director nav is handled by the toggle button and two-panel layout
     if(!isCoach){
-      // Hide all coach-only nav for pure directors
-      ['nav-sessions','nav-gameday','nav-team','nav-community','nav-resources',
-       'mob-sessions','mob-gameday','mob-team','mob-resources'].forEach(id=>{
-        const el=$(id);if(el)el.style.display='none';
-      });
+      // Pure director — hide main sidebar, it will be replaced by director two-panel layout
+      const sidebar=$('sidebar');if(sidebar)sidebar.style.display='none';
     }
     // Show role switcher for both roles
     if(role==='both'){
       const rs=$('roleSwitcher');if(rs)rs.style.display='flex';
+      // Set initial toggle button state
+      const cb=$('coachViewBtn');const db=$('directorViewBtn');
+      if(cb){cb.style.background='var(--lime)';cb.style.color='var(--dark-deep)';}
+      if(db){db.style.background='transparent';db.style.color='var(--lime-muted)';}
     }
 
     $('loadingState').style.display='none';
@@ -681,23 +682,25 @@ const App={
 
   switchView(view){
     State.currentView=view;
+    const sidebar=$('sidebar');
     const coachOnly=['nav-sessions','nav-gameday','nav-team','nav-community','nav-resources',
                      'mob-sessions','mob-gameday','mob-team','mob-resources'];
     if(view==='director'){
-      // Hide coach-only nav, keep journey for director personal use
-      coachOnly.forEach(id=>{const el=$(id);if(el)el.style.display='none'});
-      const jn=$('nav-journey');if(jn)jn.style.display='flex';
-      const mj=$('mob-journey');if(mj)mj.style.display='flex';
-      // Update button styles
-      $('coachViewBtn')?.classList.remove('btn-primary');
-      $('directorViewBtn')?.classList.add('btn-primary');
+      // Hide main sidebar — director has its own left panel
+      if(sidebar)sidebar.style.display='none';
+      // Update toggle button styles
+      const cb=$('coachViewBtn');const db=$('directorViewBtn');
+      if(cb){cb.style.background='transparent';cb.style.color='var(--lime-muted)';}
+      if(db){db.style.background='var(--lime)';db.style.color='var(--dark-deep)';}
       Nav.go('director');
     } else {
-      // Show all coach nav
+      // Show main sidebar for coach view
+      if(sidebar)sidebar.style.display='flex';
       coachOnly.forEach(id=>{const el=$(id);if(el)el.style.display='flex'});
       const jn=$('nav-journey');if(jn)jn.style.display='flex';
-      $('coachViewBtn')?.classList.add('btn-primary');
-      $('directorViewBtn')?.classList.remove('btn-primary');
+      const cb=$('coachViewBtn');const db=$('directorViewBtn');
+      if(cb){cb.style.background='var(--lime)';cb.style.color='var(--dark-deep)';}
+      if(db){db.style.background='transparent';db.style.color='var(--lime-muted)';}
       Nav.go('sessions');
     }
   },
@@ -735,10 +738,18 @@ const Nav={
   go(section,sub=null){
     State.currentSection=section;
     State.currentSubSection=sub;
-    ['sessions','gameday','team','journey','community','resources','director'].forEach(s=>{
+    ['sessions','gameday','team','journey','community','resources'].forEach(s=>{
       $(`nav-${s}`)?.classList.toggle('active',s===section);
       $(`mob-${s}`)?.classList.toggle('active',s===section);
     });
+    // Hide/show main sidebar depending on whether we are in director view
+    const sidebar=$('sidebar');
+    const mobileNav=$('mobileBottomNav');
+    if(section==='director'){
+      if(sidebar)sidebar.style.display='none';
+    } else {
+      if(sidebar)sidebar.style.display='flex';
+    }
     Nav.renderSubNav(section);
     if(section==='sessions')Sessions.render(sub);
     else if(section==='gameday')GameDay.render(sub);
@@ -2143,22 +2154,44 @@ const Director={
       {id:'tasks',label:'My Tasks',icon:'✅'},
       {id:'journey',label:'My Journey',icon:'🌿'},
     ];
-    return `<div style="display:flex;flex-direction:column;gap:2px;padding:8px">
-      ${tabs.map(t=>`<button style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-xs);border:none;background:${t.id===active?'var(--lime)':'transparent'};color:${t.id===active?'var(--dark-deep)':'#86efac'};font-family:var(--font);font-size:13px;font-weight:${t.id===active?'700':'500'};cursor:pointer;width:100%;text-align:left;transition:all .12s" onclick="Nav.go('director','${t.id}')" onmouseover="if('${t.id}'!=='${active}')this.style.background='var(--dark-mid)'" onmouseout="if('${t.id}'!=='${active}')this.style.background='transparent'">
-        <span style="font-size:15px;width:20px;text-align:center">${t.icon}</span>${t.label}
+    return `<div style="display:flex;flex-direction:column;gap:3px;padding:8px 10px">
+      ${tabs.map(t=>`<button onclick="Nav.go('director','${t.id}')"
+        style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--radius-xs);border:none;
+               background:${t.id===active?'var(--lime)':'transparent'};
+               color:${t.id===active?'var(--dark-deep)':'#86efac'};
+               font-family:var(--font);font-size:13px;font-weight:${t.id===active?'700':'500'};
+               cursor:pointer;width:100%;text-align:left;transition:all .12s;
+               border-left:3px solid ${t.id===active?'var(--dark)':'transparent'}">
+        <span style="font-size:16px">${t.icon}</span>
+        <span>${t.label}</span>
       </button>`).join('')}
-      <div style="height:1px;background:var(--dark-mid);margin:8px 4px"></div>
-      <button style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-xs);border:none;background:transparent;color:#86efac;font-family:var(--font);font-size:13px;cursor:pointer;width:100%;text-align:left" onclick="Director.renderSetup()">
-        <span style="font-size:15px;width:20px;text-align:center">⚙️</span>Club Settings
+      <div style="height:1px;background:var(--dark-mid);margin:10px 4px"></div>
+      <button onclick="Director.renderSetup()"
+        style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--radius-xs);
+               border:none;background:transparent;color:var(--lime-muted);font-family:var(--font);
+               font-size:12px;cursor:pointer;width:100%;text-align:left">
+        <span style="font-size:14px">⚙️</span>Club Settings
+      </button>
+      <button onclick="App.switchView('coach')"
+        style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--radius-xs);
+               border:none;background:transparent;color:var(--lime-muted);font-family:var(--font);
+               font-size:12px;cursor:pointer;width:100%;text-align:left">
+        <span style="font-size:14px">⚽</span>Switch to Coach View
       </button>
     </div>`;
   },
 
   setLayout(active, mainHtml){
-    // Render two-panel layout: director sidetabs + main content
+    // Full-width two-panel layout (main sidebar is hidden when in director view)
     setMain(`<div style="display:flex;height:100%;min-height:calc(100vh - 54px)">
-      <div style="width:200px;flex-shrink:0;background:var(--dark);border-right:1px solid var(--dark-mid);overflow-y:auto">
-        <div style="padding:16px 14px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--lime-muted)">Director</div>
+      <div style="width:220px;flex-shrink:0;background:var(--dark);border-right:2px solid var(--lime);overflow-y:auto;position:sticky;top:0;height:calc(100vh - 54px)">
+        <div style="padding:18px 16px 10px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--dark-mid);margin-bottom:8px">
+          <span style="font-size:18px">🏛️</span>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--lime)">Director</div>
+            <div style="font-size:10px;color:var(--lime-muted)">Dashboard</div>
+          </div>
+        </div>
         ${Director.renderSideTabs(active)}
       </div>
       <div style="flex:1;overflow-y:auto;background:var(--bg)">${mainHtml}</div>
