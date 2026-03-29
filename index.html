@@ -408,6 +408,7 @@ textarea.input{resize:vertical;min-height:80px;line-height:1.6;}
 </div>
 
 <script>
+
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
 // Version marker: FAS v2.1
 window.addEventListener('load',()=>console.log('FAS v2.1 - Team:',typeof Team,'Session:',typeof Sessions));
@@ -780,9 +781,9 @@ const Nav={
       list.map(it=>`<button class="nav-link ${State.currentSubSection===it.id?'active':''}" onclick="Nav.go('${section}','${it.id}')"><span class="nav-icon">${it.icon}</span><span>${it.label}</span></button>`).join('');
   },
 };
-</script>
 
-<script>
+
+
 // ─── SESSIONS ─────────────────────────────────────────────────────────────────
 const Sessions={
   render(sub){
@@ -1336,9 +1337,9 @@ const GameDay={
     Sessions.view(session.id);
   },
 };
-</script>
 
-<script>
+
+
 // ─── TEAM ─────────────────────────────────────────────────────────────────────
 const Team={
   render(sub){
@@ -2463,9 +2464,9 @@ PREVIOUS EMAILS — match this writing style:
   },
 
 };
-</script>
 
-<script>
+
+
 // ─── JOURNEY ──────────────────────────────────────────────────────────────────
 const Journey={
   render(sub){
@@ -3271,8 +3272,11 @@ const Resources={render(){
     if(event==='SIGNED_IN'&&session?.user&&!State.user)await App.boot(session.user);
   });
 })();
+
 </script>
+
 <script>
+
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('sw.js')
@@ -3280,6 +3284,8 @@ if('serviceWorker' in navigator){
       .catch(e=>console.log('SW error:',e));
   });
 }
+
 </script>
+
 </body>
 </html>
