@@ -409,7 +409,8 @@ textarea.input{resize:vertical;min-height:80px;line-height:1.6;}
 
 <script>
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
-console.log('FAS v2.1 loaded - Team functions present:',typeof Team!=='undefined');
+// Version marker: FAS v2.1
+window.addEventListener('load',()=>console.log('FAS v2.1 - Team:',typeof Team,'Session:',typeof Sessions));
 const SB_URL='https://bbzxpeplwufkmaqswyks.supabase.co';
 const ANTHROPIC_KEY='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';
 const OPENAI_KEY='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';
@@ -754,7 +755,10 @@ const Nav={
     Nav.renderSubNav(section);
     if(section==='sessions')Sessions.render(sub);
     else if(section==='gameday')GameDay.render(sub);
-    else if(section==='team')Team.render(sub);
+    else if(section==='team'){
+      try{Team.render(sub);}
+      catch(err){setMain('<div class="page-body"><div class="alert alert-warn"><strong>Error in Team:</strong> '+err.message+'<br><small>'+err.stack?.slice(0,200)+'</small></div></div>');}
+    }
     else if(section==='journey')Journey.render(sub);
     else if(section==='community')Community.render();
     else if(section==='resources')Resources.render();
