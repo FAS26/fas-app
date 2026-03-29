@@ -1439,30 +1439,16 @@ const Team={
         }
 
         if(isPast){
-          return`<div style="margin-bottom:12px">
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--dark);border-radius:var(--radius-xs);margin-bottom:6px;cursor:pointer" onclick="Team.togglePhase('past-${phase.id}')">
+          // Past phases — use same full rendering as active phase
+          // so facilitation guides are always accessible
+          return`<div style="margin-bottom:22px;opacity:.9">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--dark);border-radius:var(--radius-xs);margin-bottom:10px;cursor:pointer" onclick="Team.togglePhase('past-${phase.id}')">
               <div style="font-size:18px">${phase.icon}</div>
-              <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--white)">${phase.label}</div><div style="font-size:11px;color:var(--lime-muted)">${pd}/${phase.items.length} complete · tap to review</div></div>
-              <span style="font-size:11px;font-weight:600;color:${allDone?'var(--lime)':'#fbbf24'}">${allDone?'✓ Done':'In progress'} ▸</span>
+              <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--white)">${phase.label}</div><div style="font-size:11px;color:var(--lime-muted)">${phase.timing} · ${pd}/${phase.items.length} complete</div></div>
+              <span style="font-size:11px;font-weight:600;color:${allDone?'var(--lime)':'#fbbf24'}">${allDone?'✓ Complete':'In progress'} ▾</span>
             </div>
-            <div id="past-${phase.id}" style="display:${allDone?'none':'block'}">
-              ${phase.items.map(item=>{
-                const key=`${phase.id}-${item.id}`,isChecked=!!checked[key]?.checked;
-                return`<div class="roadmap-item ${isChecked?'checked':''}">
-                  <div class="check-circle ${isChecked?'checked':''}" onclick="Team.toggleRoadmap('${key}')">
-                    ${isChecked?'<svg width="9" height="9" viewBox="0 0 9 9"><polyline points="1.5,4.5 3.5,6.5 7.5,2" stroke="#14532d" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
-                  </div>
-                  <div style="flex:1">
-                    <div style="margin-bottom:3px">
-                      <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:100px;background:${item.catBg||'#f1f5f9'};color:${item.catTxt||'#334155'}">${item.cat}</span>
-                      ${item.pri==='essential'?`<span style="font-size:10px;color:var(--red);font-weight:600;margin-left:5px">Essential</span>`:''}
-                    </div>
-                    <div style="font-size:13px;font-weight:600;margin-bottom:3px;${isChecked?'text-decoration:line-through;color:var(--text-muted)':''}">${item.title}</div>
-                    <div style="font-size:12px;color:var(--text-muted);line-height:1.5">${item.desc}</div>
-                    ${item.prompt?`<details style="margin-top:7px"><summary style="cursor:pointer;font-size:12px;color:var(--dark);font-weight:600;list-style:none">▸ Facilitation guide & prompts</summary><div style="margin-top:7px;background:var(--lime-pale);border:1px solid var(--border);border-radius:var(--radius-xs);padding:11px 13px;font-size:12px;line-height:1.65;white-space:pre-line">${item.prompt}</div></details>`:''}
-                  </div>
-                </div>`;
-              }).join('')}
+            <div id="past-${phase.id}" style="display:block">
+              ${Team.renderPhaseItems(phase,checked)}
             </div>
           </div>`;
         }
@@ -1723,6 +1709,31 @@ Write a reflection. Share it with someone who will challenge you.`},
   togglePhase(id){
     const el=document.getElementById(id);
     if(el)el.style.display=el.style.display==='none'?'block':'none';
+  },
+
+  renderPhaseItems(phase,checked){
+    return phase.items.map(item=>{
+      const key=phase.id+'-'+item.id;
+      const isChecked=!!(checked[key]&&checked[key].checked);
+      const checkSvg=isChecked?'<svg width="9" height="9" viewBox="0 0 9 9"><polyline points="1.5,4.5 3.5,6.5 7.5,2" stroke="#14532d" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':'';
+      const strikeStyle=isChecked?'text-decoration:line-through;color:var(--text-muted)':'';
+      const catSpan='<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:100px;background:'+(item.catBg||'#f1f5f9')+';color:'+(item.catTxt||'#334155')+'">'+item.cat+'</span>';
+      const essSpan=item.pri==='essential'?'<span style="font-size:10px;color:var(--red);font-weight:600;margin-left:5px">Essential</span>':'';
+      let guideHtml='';
+      if(item.prompt){
+        guideHtml='<details style="margin-top:7px"><summary style="cursor:pointer;font-size:12px;color:var(--dark);font-weight:600;list-style:none;display:flex;align-items:center;gap:4px"><span>▸</span> Facilitation guide & prompts</summary>'
+          +'<div style="margin-top:7px;background:var(--lime-pale);border:1px solid #bbf7d0;border-radius:6px;padding:11px 13px;font-size:12px;line-height:1.65;white-space:pre-line;color:#0a0a0a">'+item.prompt+'</div></details>';
+      }
+      return '<div class="roadmap-item '+(isChecked?'checked':'')+'">'
+        +'<div class="check-circle '+(isChecked?'checked':'')+'" onclick="Team.toggleRoadmap(''+key+'')">'+checkSvg+'</div>'
+        +'<div style="flex:1">'
+          +'<div style="margin-bottom:3px">'+catSpan+essSpan+'</div>'
+          +'<div style="font-size:13px;font-weight:600;margin-bottom:3px;'+strikeStyle+'">'+item.title+'</div>'
+          +'<div style="font-size:12px;color:var(--text-muted);line-height:1.5">'+item.desc+'</div>'
+          +guideHtml
+        +'</div>'
+        +'</div>';
+    }).join('');
   },
 
   // ── WEEKLY EMAILS ────────────────────────────────────────────────────────────
