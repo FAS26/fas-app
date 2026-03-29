@@ -1739,17 +1739,28 @@ Write a reflection. Share it with someone who will challenge you.`},
   // ── WEEKLY EMAILS ────────────────────────────────────────────────────────────
   renderEmails(){
     State.currentSubSection='emails';
+    const startDateStr=State.settings.seasonStartDate||'';
+    const startDate=startDateStr?new Date(startDateStr):null;
+
     const weeks=Array.from({length:12},(_,i)=>{
       const wk=i+1,e=State.weeklyEmails[wk]||{};
-      const pct2=wk/12;
-      const phase=wk<=2?'Pre-Season':pct2<=0.35?'Early Season':pct2<=0.65?'Mid Season':pct2<=0.85?'Late Season':'End of Season';
+      const phase=wk<=2?'Pre-Season':wk<=4?'Early Season':wk<=8?'Mid Season':wk<=10?'Late Season':'End of Season';
       const isGame=e.email_type==='pregame';
+
+      // Figure out approximate date range for this week
+      let weekDateRange='';
+      if(startDate){
+        const wkStart=new Date(startDate);wkStart.setDate(wkStart.getDate()+(wk-1)*7);
+        const wkEnd=new Date(wkStart);wkEnd.setDate(wkEnd.getDate()+6);
+        weekDateRange=wkStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+wkEnd.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      }
+
       return`<div class="week-card">
         <div class="week-card-hdr" onclick="Team.toggleWeek(${wk})">
           <div class="week-num">${wk}</div>
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:600">Week ${wk}</div>
-            <div style="font-size:11px;color:var(--text-muted)">${phase} · ${e.sent?'<span style="color:#15803d;font-weight:600">✓ Sent</span>':'Not sent'}</div>
+            <div style="font-size:13px;font-weight:600">Week ${wk} — ${phase}${weekDateRange?' · '+weekDateRange:''}</div>
+            <div style="font-size:11px;color:var(--text-muted)">${e.sent?'<span style="color:#15803d;font-weight:600">✓ Sent</span>':'Not sent'}</div>
           </div>
           <span id="wa-${wk}" style="font-size:15px;color:var(--text-faint)">›</span>
         </div>
@@ -1759,43 +1770,65 @@ Write a reflection. Share it with someone who will challenge you.`},
             <button class="tab-btn ${isGame?'active':''}" onclick="Team.setEmailType(${wk},'pregame')">🏟️ Pre-Game Email</button>
           </div>
           <div id="et-form-${wk}">
-            ${Team.emailForm(wk,e,isGame)}
+            ${Team.emailHints(wk,isGame)}
           </div>
-          <div style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn btn-primary btn-sm" onclick="Team.generateEmail(${wk})">Generate Email</button>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="Team.generateEmailAI(${wk})">✨ Generate from Sessions</button>
             <button class="btn btn-sm" onclick="Team.markSent(${wk})">${e.sent?'✓ Sent':'Mark as Sent'}</button>
           </div>
-          <div id="ep-${wk}" style="display:${e.body?'block':'none'};margin-top:12px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px">Generated Email — copy and send</div>
-              <button class="btn btn-sm btn-dark" onclick="navigator.clipboard.writeText(document.getElementById('et-body-${wk}').innerText)">Copy</button>
+          <div id="ep-${wk}" style="display:${e.body?'block':'none'};margin-top:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px">Generated Email — edit below then copy</div>
+              <button class="btn btn-sm btn-dark" onclick="Team.copyEmail(${wk})">Copy</button>
             </div>
-            <div id="et-body-${wk}" style="background:var(--lime-pale);border:1px solid var(--border);border-radius:var(--radius-xs);padding:14px;font-size:13px;line-height:1.9;white-space:pre-wrap;font-family:var(--font)">${e.body||''}</div>
+            <textarea id="et-body-${wk}" class="input" style="min-height:320px;font-size:13px;line-height:1.9;font-family:var(--font)" onchange="Team.saveEmailBody(${wk})">${e.body||''}</textarea>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn btn-primary btn-sm" onclick="Team.copyEmail(${wk})">📋 Copy to Clipboard</button>
+              <button class="btn btn-sm" onclick="Team.markSent(${wk})">✓ Mark as Sent</button>
+              <button class="btn btn-sm btn-dark" onclick="Team.generateEmailAI(${wk})">↺ Regenerate</button>
+            </div>
           </div>
         </div>
       </div>`;
     }).join('');
 
     setMain(`
-    <div class="page-header"><h1>Weekly Parent Emails</h1><p>12-week season · Monday recap + Pre-Game previews · Written in your voice</p></div>
+    <div class="page-header"><h1>Weekly Parent Emails</h1><p>AI generates from your session uploads · Edit freely · Copy and send</p></div>
     <div class="page-body">
-      <div class="alert alert-info" style="margin-bottom:14px">Two email types: <strong>Monday</strong> emails look back at the game and forward to this week's training. <strong>Pre-Game</strong> emails tell parents what to look for on match day. Both are written as natural conversation — not bullet points.</div>
+      <div class="alert alert-info" style="margin-bottom:14px">
+        <strong>How it works:</strong> Click <strong>Generate from Sessions</strong> on any week. The AI reads your recent session uploads and game day reports from that week and writes the email in your voice — as flowing paragraphs, no headers. Edit anything you like before sending.
+      </div>
       ${weeks}
     </div>`);
   },
 
-  emailForm(wk,e,isGame){
-    if(isGame){
-      return`<div class="form-group"><label class="label">What to look for in this match</label><textarea id="wf-${wk}" class="input" placeholder="What should parents watch for? What are players working on in the game?" style="min-height:70px">${e.focus||''}</textarea></div>
-      <div class="form-group"><label class="label">What we've been working on in training</label><textarea id="wr-${wk}" class="input" placeholder="What have sessions been focused on leading up to this game?" style="min-height:60px">${e.recap||''}</textarea></div>
-      <div class="form-group"><label class="label">Sideline reminder for parents</label><textarea id="wre-${wk}" class="input" placeholder="How can parents support best from the sideline? (e.g. encourage without directing, let them communicate their ideas)" style="min-height:55px">${e.reinforce||''}</textarea></div>
-      <div class="form-group"><label class="label">Match details (time, location, kit)</label><input type="text" id="wsc-${wk}" class="input" placeholder="Kick-off time, venue, what to bring" value="${e.schedule||''}"></div>`;
+  emailHints(wk,isGame){
+    // Show what sessions will be used + optional extra context fields
+    const startDateStr=State.settings.seasonStartDate||'';
+    const startDate=startDateStr?new Date(startDateStr):null;
+    let relevantSessions=[];
+    if(startDate){
+      const wkStart=new Date(startDate);wkStart.setDate(wkStart.getDate()+(wk-1)*7);
+      const wkEnd=new Date(wkStart);wkEnd.setDate(wkEnd.getDate()+6);
+      relevantSessions=State.sessions.filter(s=>{
+        const d=new Date(s.date||s.created_at);
+        return d>=wkStart&&d<=wkEnd;
+      });
     }
-    return`<div class="form-group"><label class="label">Game Saturday — how did it go?</label><textarea id="wf-${wk}" class="input" placeholder="How did the game go? What are they doing well? What's a work in progress? Connect to their development — not just the result." style="min-height:80px">${e.focus||''}</textarea></div>
-    <div class="form-group"><label class="label">Training this week — what's the focus?</label><textarea id="wr-${wk}" class="input" placeholder="What are you working on in training? Break down by session if multiple. Explain the WHY so parents understand the purpose." style="min-height:70px">${e.recap||''}</textarea></div>
-    <div class="form-group"><label class="label">One thing to reinforce at home / on the sideline</label><textarea id="wre-${wk}" class="input" placeholder="What can parents ask or do? Sideline guidance — encourage without directing." style="min-height:55px">${e.reinforce||''}</textarea></div>
-    <div class="form-group"><label class="label">Player spotlight (optional)</label><input type="text" id="wsp-${wk}" class="input" placeholder="Name a player and what they did — specific and genuine" value="${e.spotlight||''}"></div>
-    <div class="form-group"><label class="label">Upcoming schedule / logistics</label><input type="text" id="wsc-${wk}" class="input" placeholder="Next match, training times, reminders" value="${e.schedule||''}"></div>`;
+    const trainingSessions=relevantSessions.filter(s=>!s.session_objective?.startsWith('GAMEDAY')&&s.session_objective!=='Game Day');
+    const gameDays=relevantSessions.filter(s=>s.session_objective?.startsWith('GAMEDAY')||s.session_objective==='Game Day');
+
+    const sessionInfo=relevantSessions.length
+      ?`<div class="alert alert-success" style="margin-bottom:10px"><strong>✓ ${trainingSessions.length} training session${trainingSessions.length!==1?'s':''} + ${gameDays.length} game report${gameDays.length!==1?'s':''} found for this week</strong><br>${relevantSessions.map(s=>'· '+s.title).join('<br>')}</div>`
+      :`<div class="alert alert-warn" style="margin-bottom:10px"><strong>No sessions uploaded for this week yet.</strong> Upload a session or game day report first for the best results — or click Generate anyway and add context below.</div>`;
+
+    return sessionInfo+`
+    <div class="form-group"><label class="label">Additional context (optional — add anything the AI should know)</label>
+      <textarea id="wctx-${wk}" class="input" placeholder="${isGame?'e.g. Game is at home, 11am Saturday. Weather might be cold — remind parents to bring layers. We are missing two players this week.':'e.g. We have two sessions this week — Monday and Wednesday. We are working on transitions. Bradley has been putting in extra effort and deserves a mention.'}" style="min-height:70px"></textarea>
+    </div>
+    <div class="form-group"><label class="label">Logistics / schedule (time, location, reminders)</label>
+      <input type="text" id="wsc-${wk}" class="input" placeholder="${isGame?'e.g. Saturday 11am at Riverside Park, Field 3':'e.g. Training Mon 6pm + Wed 6pm · Game Saturday 10am'}">
+    </div>`;
   },
 
   setEmailType(wk,type){
@@ -1803,7 +1836,7 @@ Write a reflection. Share it with someone who will challenge you.`},
     e.email_type=type;
     State.weeklyEmails[wk]=e;
     const formEl=$(`et-form-${wk}`);
-    if(formEl)formEl.innerHTML=Team.emailForm(wk,e,type==='pregame');
+    if(formEl)formEl.innerHTML=Team.emailHints(wk,type==='pregame');
     const tabs=$(`wb-${wk}`)?.querySelectorAll('.tab-btn');
     if(tabs){tabs[0].classList.toggle('active',type==='monday');tabs[1].classList.toggle('active',type==='pregame');}
   },
@@ -1814,56 +1847,167 @@ Write a reflection. Share it with someone who will challenge you.`},
     if(a)a.textContent=open?'⌄':'›';
   },
 
-  buildEmail(wk,f,isGame){
-    const name=coachName();
-    const vals=State.values;
-    let body='';
-
-    if(isGame){
-      body=`Hi everyone,\n\nI just wanted to send a quick note ahead of our game this ${f.schedule?'':' week'}. ${f.schedule?`We kick off ${f.schedule}. `:''}I am really looking forward to watching the team compete.\n\n`;
-      if(f.recap){body+=`In training leading up to this game we have been focused on ${f.recap.trim()}. It has been great to see the effort and the growth that has come with it.\n\n`;}
-      if(f.focus){body+=`WHAT TO LOOK FOR\n${f.focus.trim()}\n\nAs always, there will be moments that go well and moments that are a work in progress — that is the nature of development, and it is exactly what we want to see. The mistakes are part of the process.\n\n`;}
-      if(f.reinforce){body+=`${f.reinforce.trim()}\n\n`;}else{body+=`The best thing you can do on the sideline is be encouraging without providing direction. It is important that the players are able to communicate their own ideas on the field and learn through their own experience. Your positive energy makes a real difference.\n\n`;}
-      body+=`Thank you for all that you do!\n\n${name}`;
-      return body;
-    }
-
-    body=`Hi everyone,\n\n`;
-    if(f.focus){
-      body+=`GAME SATURDAY\n\n${f.focus.trim()}\n\n`;
-    }
-    if(f.recap){
-      body+=`TRAINING THIS WEEK\n\n${f.recap.trim()}\n\n`;
-    }
-    if(f.reinforce){
-      body+=`${f.reinforce.trim()}\n\n`;
-    }
-    if(f.spotlight){
-      body+=`I also want to take a moment to recognise ${f.spotlight.trim()}. It is moments like these that make coaching so rewarding.\n\n`;
-    }
-    if(f.schedule){
-      body+=`UPCOMING\n${f.schedule.trim()}\n\n`;
-    }
-    body+=`Thank you for all that you do!\n\n${name}`;
-    return body;
+  copyEmail(wk){
+    const el=$(`et-body-${wk}`);
+    if(!el)return;
+    navigator.clipboard.writeText(el.value||el.innerText||'').then(()=>{
+      const btn=event.target;const orig=btn.textContent;
+      btn.textContent='✓ Copied!';btn.style.background='var(--lime)';btn.style.color='var(--dark-deep)';
+      setTimeout(()=>{btn.textContent=orig;btn.style.background='';btn.style.color='';},2000);
+    });
   },
 
-  async generateEmail(wk){
+  async saveEmailBody(wk){
+    const body=$(`et-body-${wk}`)?.value||'';
+    State.weeklyEmails[wk]={...State.weeklyEmails[wk],body};
+    await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,body},{onConflict:'user_id,week'});
+  },
+
+  async generateEmailAI(wk){
     const isGame=State.weeklyEmails[wk]?.email_type==='pregame';
-    const fields={
-      focus:$(`wf-${wk}`)?.value||'',
-      recap:$(`wr-${wk}`)?.value||'',
-      reinforce:$(`wre-${wk}`)?.value||'',
-      spotlight:$(`wsp-${wk}`)?.value||'',
-      schedule:$(`wsc-${wk}`)?.value||'',
-      email_type:isGame?'pregame':'monday',
-    };
-    const body=Team.buildEmail(wk,fields,isGame);
-    fields.body=body;
-    State.weeklyEmails[wk]={...State.weeklyEmails[wk],...fields};
+    const context=$(`wctx-${wk}`)?.value?.trim()||'';
+    const schedule=$(`wsc-${wk}`)?.value?.trim()||'';
     const ep=$(`ep-${wk}`),eb=$(`et-body-${wk}`);
-    if(ep&&eb){ep.style.display='block';eb.innerText=body;}
-    await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,...fields},{onConflict:'user_id,week'});
+
+    // Show loading
+    if(ep)ep.style.display='block';
+    if(eb){eb.value='Generating email from your sessions…';eb.style.opacity='0.5';}
+
+    // Get relevant sessions for this week
+    const startDateStr=State.settings.seasonStartDate||'';
+    const startDate=startDateStr?new Date(startDateStr):null;
+    let weekSessions=[];
+    if(startDate){
+      const wkStart=new Date(startDate);wkStart.setDate(wkStart.getDate()+(wk-1)*7);
+      const wkEnd=new Date(wkStart);wkEnd.setDate(wkEnd.getDate()+6);
+      weekSessions=State.sessions.filter(s=>{const d=new Date(s.date||s.created_at);return d>=wkStart&&d<=wkEnd;});
+    }
+    // If no date set, use last 2 sessions
+    if(!weekSessions.length){
+      weekSessions=State.sessions.slice(0,2);
+    }
+
+    const trainingSessions=weekSessions.filter(s=>!s.session_objective?.startsWith('GAMEDAY')&&s.session_objective!=='Game Day');
+    const gameDays=weekSessions.filter(s=>s.session_objective?.startsWith('GAMEDAY')||s.session_objective==='Game Day');
+
+    // Get previous emails to match writing style
+    const prevEmails=Object.values(State.weeklyEmails).filter(e=>e.body&&e.week<wk).slice(-3);
+    const styleExamples=prevEmails.map(e=>e.body).join('
+
+---
+
+');
+
+    // Build session summaries (no raw transcripts — just the AI analysis)
+    const sessionSummaries=trainingSessions.map(s=>`Training session: "${s.title}" (${s.date||''})
+Focus areas: ${s.focus_area_1||''}${s.focus_area_2?', '+s.focus_area_2:''}
+What went well: ${s.encouragement||''}
+Grade: ${s.grade||''}
+Age group: ${s.age_group||''}`).join('
+
+');
+
+    const gameSummaries=gameDays.map(s=>`Game day: "${s.title}" (${s.date||''})
+What went well: ${s.encouragement||''}
+Focus areas: ${s.focus_area_1||''}${s.focus_area_2?', '+s.focus_area_2:''}
+Grade: ${s.grade||''}`).join('
+
+');
+
+    const coachFirstName=State.profile?.first_name||coachName();
+    const name=coachName();
+    const vals=State.values.length?'Team values: '+State.values.join(', '):'';
+
+    const prompt=`You are writing a parent email for ${name}, a football/soccer coach.
+
+EMAIL TYPE: ${isGame?'Pre-Game email — what parents should look for on match day':'Monday email — looking back at the game, looking forward to training this week'}
+
+${sessionSummaries?`TRAINING SESSIONS THIS WEEK:
+${sessionSummaries}
+`:''}
+${gameSummaries?`GAME DAY REPORT:
+${gameSummaries}
+`:''}
+${vals}
+${schedule?`Logistics: ${schedule}`:''}
+${context?`Additional context from coach: ${context}`:''}
+
+${styleExamples?`PREVIOUS EMAILS FROM THIS COACH (match their writing style exactly):
+${styleExamples}`:''}
+
+WRITING RULES — follow these exactly:
+1. Write in flowing paragraphs — NO headers, NO bullet points, NO all-caps section titles
+2. Conversational and warm — like a letter from someone who genuinely cares
+3. Development-focused — never just about the result, always about growth
+4. Normalise mistakes — they are part of the process
+5. Include sideline guidance naturally woven into the text — encourage without directing
+6. Reference the team values naturally if relevant: ${vals}
+7. If there was a game report, open with a genuine reflection on what you observed
+8. If there are training sessions, explain what you are working on and WHY so parents understand
+9. End with "Thank you for all that you do!" and the coach's name: ${name}
+10. Start with "Hi everyone,"
+11. Maximum 3 paragraphs — keep it readable
+12. ${isGame?'Focus on what parents will see — help them watch intelligently. Tell them what you are hoping the players try, and that mistakes are part of the process. Remind them the best thing they can do is encourage without directing.':'Look back at the game Saturday with genuine warmth, then look forward to training this week.'}
+
+Write ONLY the email text — nothing else. No subject line. No commentary.`;
+
+    try{
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]})
+      });
+      let body='';
+      if(resp.ok){
+        const data=await resp.json();
+        body=data.content[0].text.trim();
+      } else {
+        body=Team.fallbackEmail(isGame,trainingSessions,gameDays,schedule,context,name);
+      }
+      if(eb){eb.value=body;eb.style.opacity='1';}
+      State.weeklyEmails[wk]={...State.weeklyEmails[wk],body,email_type:isGame?'pregame':'monday'};
+      await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,body,email_type:isGame?'pregame':'monday'},{onConflict:'user_id,week'});
+    }catch(e){
+      const body=Team.fallbackEmail(isGame,trainingSessions,gameDays,schedule,context,name);
+      if(eb){eb.value=body;eb.style.opacity='1';}
+    }
+  },
+
+  fallbackEmail(isGame,trainingSessions,gameDays,schedule,context,name){
+    const game=gameDays[0];const session=trainingSessions[0];
+    if(isGame){
+      let b='Hi everyone,
+
+';
+      if(session){b+=`This week in training we have been working on ${session.focus_area_1||session.title||'our session objectives'}. It has been great to see the effort and growth that has come with it.
+
+`;}
+      b+=`I am really looking forward to watching the team compete${schedule?' — '+schedule:''}. As always there will be moments that go well and moments that are a work in progress. That is the nature of development and it is exactly what we want to see.
+
+`;
+      b+=`The best thing you can do on the sideline is be encouraging without providing direction. It is important that the players are able to communicate their own ideas on the field and learn through their own experience.
+
+`;
+      b+=`Thank you for all that you do!
+
+${name}`;
+      return b;
+    }
+    let b='Hi everyone,
+
+';
+    if(game){b+=`${game.encouragement||'It was great to watch the team on Saturday. They are developing well and it shows in the way they are playing.'}
+
+`;}
+    if(session){b+=`This week we are going to focus on ${session.focus_area_1||session.title||'continuing our development'}. ${session.focus_area_2?'We will also be working on '+session.focus_area_2+'. ':''}`;}
+    if(context){b+=context+' ';}
+    if(b.length>60){b+='
+
+';}
+    b+=`Thank you for all that you do!
+
+${name}`;
+    return b;
   },
 
   async markSent(wk){
