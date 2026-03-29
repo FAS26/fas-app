@@ -1,33 +1,20 @@
-const CACHE = 'fas-v1';
-const ASSETS = [
-  '/fas-app/',
-  '/fas-app/index.html'
-];
+// FAS Service Worker v2 — cache busting
+const CACHE = 'fas-v2';
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(ASSETS))
-  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.map(k => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
+// Always fetch from network — no caching
 self.addEventListener('fetch', e => {
-  // For API calls always go to network
-  if(e.request.url.includes('api.anthropic.com') ||
-     e.request.url.includes('api.openai.com') ||
-     e.request.url.includes('supabase.co')) {
-    return;
-  }
-  e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
-  );
+  e.respondWith(fetch(e.request));
 });
