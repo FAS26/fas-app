@@ -1414,32 +1414,56 @@ const Team={
         const isPast=status==='past'&&startDateStr;
 
         if(isFuture){
-          // Future phases — collapsed, locked
           const weeksUntil=phase.id==='early'?Math.max(0,1-weekNum):phase.id==='mid'?Math.max(0,5-weekNum):phase.id==='late'?Math.max(0,10-weekNum):Math.max(0,13-weekNum);
-          return`<div style="margin-bottom:12px;opacity:.55">
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--dark);border-radius:var(--radius-xs)">
+          return`<div style="margin-bottom:12px;opacity:.75">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--dark);border-radius:var(--radius-xs);cursor:pointer" onclick="Team.togglePhase('future-${phase.id}')">
               <div style="font-size:18px">${phase.icon}</div>
-              <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--white)">${phase.label}</div><div style="font-size:11px;color:var(--lime-muted)">${phase.timing}</div></div>
-              <span style="font-size:11px;color:#6b7280">🔒 Opens in ${weeksUntil} week${weeksUntil!==1?'s':''}</span>
+              <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--white)">${phase.label}</div><div style="font-size:11px;color:var(--lime-muted)">${phase.timing} · ${phase.items.length} tasks</div></div>
+              <span style="font-size:11px;color:var(--lime-muted)">In ${weeksUntil}w · preview ▸</span>
+            </div>
+            <div id="future-${phase.id}" style="display:none">
+              ${phase.items.map(item=>`<div class="roadmap-item" style="opacity:.7">
+                <div class="check-circle" style="cursor:default;opacity:.3"></div>
+                <div style="flex:1">
+                  <div style="margin-bottom:2px">
+                    <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:100px;background:${item.catBg||'#f1f5f9'};color:${item.catTxt||'#334155'}">${item.cat}</span>
+                    ${item.pri==='essential'?`<span style="font-size:10px;color:var(--red);font-weight:600;margin-left:5px">Essential</span>`:''}
+                  </div>
+                  <div style="font-size:13px;font-weight:600;color:var(--text-muted)">${item.title}</div>
+                  <div style="font-size:12px;color:var(--text-faint);line-height:1.5">${item.desc}</div>
+                  ${item.prompt?`<details style="margin-top:7px"><summary style="cursor:pointer;font-size:12px;color:var(--text-muted);font-weight:600;list-style:none">▸ Preview facilitation guide</summary><div style="margin-top:7px;background:var(--lime-pale);border:1px solid var(--border);border-radius:var(--radius-xs);padding:11px 13px;font-size:12px;line-height:1.65;white-space:pre-line">${item.prompt}</div></details>`:''}
+                </div>
+              </div>`).join('')}
             </div>
           </div>`;
         }
 
         if(isPast){
-          // Past phases — summary only
           return`<div style="margin-bottom:12px">
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--dark);border-radius:var(--radius-xs);margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--dark);border-radius:var(--radius-xs);margin-bottom:6px;cursor:pointer" onclick="Team.togglePhase('past-${phase.id}')">
               <div style="font-size:18px">${phase.icon}</div>
-              <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--white)">${phase.label}</div><div style="font-size:11px;color:var(--lime-muted)">${pd}/${phase.items.length} complete</div></div>
-              <span style="font-size:11px;font-weight:600;color:${allDone?'var(--lime)':'#fbbf24'}">${allDone?'✓ Done':'In progress'}</span>
+              <div style="flex:1"><div style="font-size:14px;font-weight:700;color:var(--white)">${phase.label}</div><div style="font-size:11px;color:var(--lime-muted)">${pd}/${phase.items.length} complete · tap to review</div></div>
+              <span style="font-size:11px;font-weight:600;color:${allDone?'var(--lime)':'#fbbf24'}">${allDone?'✓ Done':'In progress'} ▸</span>
             </div>
-            ${!allDone?`<div style="padding:0 4px">${phase.items.filter(it=>!checked[`${phase.id}-${it.id}`]?.checked).map(item=>{
-              const key=`${phase.id}-${item.id}`;
-              return`<div class="roadmap-item">
-                <div class="check-circle" onclick="Team.toggleRoadmap('${key}')"></div>
-                <div style="flex:1"><div style="font-size:13px;font-weight:600">${item.title}</div><div style="font-size:11px;color:var(--text-muted)">${item.cat}</div></div>
-              </div>`;
-            }).join('')}</div>`:''}
+            <div id="past-${phase.id}" style="display:${allDone?'none':'block'}">
+              ${phase.items.map(item=>{
+                const key=`${phase.id}-${item.id}`,isChecked=!!checked[key]?.checked;
+                return`<div class="roadmap-item ${isChecked?'checked':''}">
+                  <div class="check-circle ${isChecked?'checked':''}" onclick="Team.toggleRoadmap('${key}')">
+                    ${isChecked?'<svg width="9" height="9" viewBox="0 0 9 9"><polyline points="1.5,4.5 3.5,6.5 7.5,2" stroke="#14532d" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+                  </div>
+                  <div style="flex:1">
+                    <div style="margin-bottom:3px">
+                      <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:100px;background:${item.catBg||'#f1f5f9'};color:${item.catTxt||'#334155'}">${item.cat}</span>
+                      ${item.pri==='essential'?`<span style="font-size:10px;color:var(--red);font-weight:600;margin-left:5px">Essential</span>`:''}
+                    </div>
+                    <div style="font-size:13px;font-weight:600;margin-bottom:3px;${isChecked?'text-decoration:line-through;color:var(--text-muted)':''}">${item.title}</div>
+                    <div style="font-size:12px;color:var(--text-muted);line-height:1.5">${item.desc}</div>
+                    ${item.prompt?`<details style="margin-top:7px"><summary style="cursor:pointer;font-size:12px;color:var(--dark);font-weight:600;list-style:none">▸ Facilitation guide & prompts</summary><div style="margin-top:7px;background:var(--lime-pale);border:1px solid var(--border);border-radius:var(--radius-xs);padding:11px 13px;font-size:12px;line-height:1.65;white-space:pre-line">${item.prompt}</div></details>`:''}
+                  </div>
+                </div>`;
+              }).join('')}
+            </div>
           </div>`;
         }
 
@@ -1453,7 +1477,7 @@ const Team={
           ${phase.items.map(item=>{
             const key=`${phase.id}-${item.id}`,isChecked=!!checked[key]?.checked;
             const isThisWeek=thisWeekTask?.item.id===item.id&&thisWeekTask?.phase.id===phase.id;
-            return`<div class="roadmap-item ${isChecked?'checked':''}" style="${isThisWeek?'display:none':''}">
+            return`<div class="roadmap-item ${isChecked?'checked':''}" style="${isThisWeek?'border:1px solid var(--lime);background:#f0fdf4;':''}">
               <div class="check-circle ${isChecked?'checked':''}" onclick="Team.toggleRoadmap('${key}')">
                 ${isChecked?'<svg width="9" height="9" viewBox="0 0 9 9"><polyline points="1.5,4.5 3.5,6.5 7.5,2" stroke="#14532d" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
               </div>
@@ -1694,6 +1718,11 @@ Write a reflection. Share it with someone who will challenge you.`},
     State.roadmap[key]={checked:nv,notes:State.roadmap[key]?.notes||''};
     await sb.from('roadmap').upsert({user_id:State.user.id,coach_name:coachName(),key,checked:nv},{onConflict:'user_id,key'});
     Team.renderRoadmap();
+  },
+
+  togglePhase(id){
+    const el=document.getElementById(id);
+    if(el)el.style.display=el.style.display==='none'?'block':'none';
   },
 
   // ── WEEKLY EMAILS ────────────────────────────────────────────────────────────
