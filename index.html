@@ -1742,101 +1742,103 @@ Write a reflection. Share it with someone who will challenge you.`},
     const startDateStr=State.settings.seasonStartDate||'';
     const startDate=startDateStr?new Date(startDateStr):null;
 
-    const weeks=Array.from({length:12},(_,i)=>{
-      const wk=i+1,e=State.weeklyEmails[wk]||{};
+    const weekRows=[];
+    for(let i=0;i<12;i++){
+      const wk=i+1;
+      const e=State.weeklyEmails[wk]||{};
       const phase=wk<=2?'Pre-Season':wk<=4?'Early Season':wk<=8?'Mid Season':wk<=10?'Late Season':'End of Season';
       const isGame=e.email_type==='pregame';
-
-      // Figure out approximate date range for this week
       let weekDateRange='';
       if(startDate){
-        const wkStart=new Date(startDate);wkStart.setDate(wkStart.getDate()+(wk-1)*7);
-        const wkEnd=new Date(wkStart);wkEnd.setDate(wkEnd.getDate()+6);
-        weekDateRange=wkStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+wkEnd.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+        const wkS=new Date(startDate);wkS.setDate(wkS.getDate()+(wk-1)*7);
+        const wkE=new Date(wkS);wkE.setDate(wkE.getDate()+6);
+        weekDateRange=wkS.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+wkE.toLocaleDateString('en-US',{month:'short',day:'numeric'});
       }
+      const sentBadge=e.sent?'<span style="color:#15803d;font-weight:600">✓ Sent</span>':'Not sent';
+      const monday_active=!isGame?'active':'';
+      const pregame_active=isGame?'active':'';
+      const bodyDisplay=e.body?'block':'none';
+      const bodyVal=e.body||'';
+      const sentBtn=e.sent?'✓ Sent':'Mark as Sent';
 
-      return`<div class="week-card">
-        <div class="week-card-hdr" onclick="Team.toggleWeek(${wk})">
-          <div class="week-num">${wk}</div>
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:600">Week ${wk} — ${phase}${weekDateRange?' · '+weekDateRange:''}</div>
-            <div style="font-size:11px;color:var(--text-muted)">${e.sent?'<span style="color:#15803d;font-weight:600">✓ Sent</span>':'Not sent'}</div>
-          </div>
-          <span id="wa-${wk}" style="font-size:15px;color:var(--text-faint)">›</span>
-        </div>
-        <div class="week-body" id="wb-${wk}">
-          <div class="tabs" style="margin-bottom:12px">
-            <button class="tab-btn ${!isGame?'active':''}" onclick="Team.setEmailType(${wk},'monday')">📅 Monday Email</button>
-            <button class="tab-btn ${isGame?'active':''}" onclick="Team.setEmailType(${wk},'pregame')">🏟️ Pre-Game Email</button>
-          </div>
-          <div id="et-form-${wk}">
-            ${Team.emailHints(wk,isGame)}
-          </div>
-          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-            <button class="btn btn-primary btn-sm" onclick="Team.generateEmailAI(${wk})">✨ Generate from Sessions</button>
-            <button class="btn btn-sm" onclick="Team.markSent(${wk})">${e.sent?'✓ Sent':'Mark as Sent'}</button>
-          </div>
-          <div id="ep-${wk}" style="display:${e.body?'block':'none'};margin-top:14px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px">Generated Email — edit below then copy</div>
-              <button class="btn btn-sm btn-dark" onclick="Team.copyEmail(${wk})">Copy</button>
-            </div>
-            <textarea id="et-body-${wk}" class="input" style="min-height:320px;font-size:13px;line-height:1.9;font-family:var(--font)" onchange="Team.saveEmailBody(${wk})">${e.body||''}</textarea>
-            <div style="display:flex;gap:8px;margin-top:8px">
-              <button class="btn btn-primary btn-sm" onclick="Team.copyEmail(${wk})">📋 Copy to Clipboard</button>
-              <button class="btn btn-sm" onclick="Team.markSent(${wk})">✓ Mark as Sent</button>
-              <button class="btn btn-sm btn-dark" onclick="Team.generateEmailAI(${wk})">↺ Regenerate</button>
-            </div>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
+      weekRows.push('<div class="week-card">'
+        +'<div class="week-card-hdr" onclick="Team.toggleWeek('+wk+')">'
+          +'<div class="week-num">'+wk+'</div>'
+          +'<div style="flex:1">'
+            +'<div style="font-size:13px;font-weight:600">Week '+wk+' — '+phase+(weekDateRange?' · '+weekDateRange:'')+'</div>'
+            +'<div style="font-size:11px;color:var(--text-muted)">'+sentBadge+'</div>'
+          +'</div>'
+          +'<span id="wa-'+wk+'" style="font-size:15px;color:var(--text-faint)">›</span>'
+        +'</div>'
+        +'<div class="week-body" id="wb-'+wk+'">'
+          +'<div class="tabs" style="margin-bottom:12px">'
+            +'<button class="tab-btn '+monday_active+'" onclick="Team.setEmailType('+wk+','monday')">📅 Monday Email</button>'
+            +'<button class="tab-btn '+pregame_active+'" onclick="Team.setEmailType('+wk+','pregame')">🏟️ Pre-Game Email</button>'
+          +'</div>'
+          +'<div id="et-form-'+wk+'">'
+            +Team.emailHintsStatic(wk,isGame,e)
+          +'</div>'
+          +'<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+            +'<button class="btn btn-primary btn-sm" onclick="Team.generateEmailAI('+wk+')">✨ Generate from Sessions</button>'
+            +'<button class="btn btn-sm" onclick="Team.markSent('+wk+')">'+sentBtn+'</button>'
+          +'</div>'
+          +'<div id="ep-'+wk+'" style="display:'+bodyDisplay+';margin-top:14px">'
+            +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+              +'<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px">Generated Email — edit below then copy</div>'
+              +'<button class="btn btn-sm btn-dark" onclick="Team.copyEmail('+wk+')">Copy</button>'
+            +'</div>'
+            +'<textarea id="et-body-'+wk+'" class="input" style="min-height:320px;font-size:13px;line-height:1.9;font-family:var(--font)" onblur="Team.saveEmailBody('+wk+')">'+bodyVal.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</textarea>'
+            +'<div style="display:flex;gap:8px;margin-top:8px">'
+              +'<button class="btn btn-primary btn-sm" onclick="Team.copyEmail('+wk+')">📋 Copy</button>'
+              +'<button class="btn btn-sm" onclick="Team.markSent('+wk+')">✓ Mark as Sent</button>'
+              +'<button class="btn btn-sm btn-dark" onclick="Team.generateEmailAI('+wk+')">↺ Regenerate</button>'
+            +'</div>'
+          +'</div>'
+        +'</div>'
+        +'</div>');
+    }
 
-    setMain(`
-    <div class="page-header"><h1>Weekly Parent Emails</h1><p>AI generates from your session uploads · Edit freely · Copy and send</p></div>
-    <div class="page-body">
-      <div class="alert alert-info" style="margin-bottom:14px">
-        <strong>How it works:</strong> Click <strong>Generate from Sessions</strong> on any week. The AI reads your recent session uploads and game day reports from that week and writes the email in your voice — as flowing paragraphs, no headers. Edit anything you like before sending.
-      </div>
-      ${weeks}
-    </div>`);
+    setMain('<div class="page-header"><h1>Weekly Parent Emails</h1><p>AI generates from your sessions · Edit freely · Copy and send</p></div>'
+      +'<div class="page-body">'
+      +'<div class="alert alert-info" style="margin-bottom:14px"><strong>How it works:</strong> Click <strong>Generate from Sessions</strong> on any week. The AI reads your session uploads and game day reports from that week and writes the email in your voice — flowing paragraphs, no headers. Edit anything before sending.</div>'
+      +weekRows.join('')
+      +'</div>');
   },
 
-  emailHints(wk,isGame){
-    // Show what sessions will be used + optional extra context fields
+  emailHintsStatic(wk,isGame,e){
+    // Static version called during renderEmails (no live DOM access)
     const startDateStr=State.settings.seasonStartDate||'';
     const startDate=startDateStr?new Date(startDateStr):null;
     let relevantSessions=[];
     if(startDate){
       const wkStart=new Date(startDate);wkStart.setDate(wkStart.getDate()+(wk-1)*7);
       const wkEnd=new Date(wkStart);wkEnd.setDate(wkEnd.getDate()+6);
-      relevantSessions=State.sessions.filter(s=>{
-        const d=new Date(s.date||s.created_at);
-        return d>=wkStart&&d<=wkEnd;
-      });
+      relevantSessions=State.sessions.filter(s=>{const d=new Date(s.date||s.created_at);return d>=wkStart&&d<=wkEnd;});
+    } else {
+      relevantSessions=wk===1?State.sessions.slice(0,2):[];
     }
-    const trainingSessions=relevantSessions.filter(s=>!s.session_objective?.startsWith('GAMEDAY')&&s.session_objective!=='Game Day');
-    const gameDays=relevantSessions.filter(s=>s.session_objective?.startsWith('GAMEDAY')||s.session_objective==='Game Day');
-
-    const sessionInfo=relevantSessions.length
-      ?`<div class="alert alert-success" style="margin-bottom:10px"><strong>✓ ${trainingSessions.length} training session${trainingSessions.length!==1?'s':''} + ${gameDays.length} game report${gameDays.length!==1?'s':''} found for this week</strong><br>${relevantSessions.map(s=>'· '+s.title).join('<br>')}</div>`
-      :`<div class="alert alert-warn" style="margin-bottom:10px"><strong>No sessions uploaded for this week yet.</strong> Upload a session or game day report first for the best results — or click Generate anyway and add context below.</div>`;
-
-    return sessionInfo+`
-    <div class="form-group"><label class="label">Additional context (optional — add anything the AI should know)</label>
-      <textarea id="wctx-${wk}" class="input" placeholder="${isGame?'e.g. Game is at home, 11am Saturday. Weather might be cold — remind parents to bring layers. We are missing two players this week.':'e.g. We have two sessions this week — Monday and Wednesday. We are working on transitions. Bradley has been putting in extra effort and deserves a mention.'}" style="min-height:70px"></textarea>
-    </div>
-    <div class="form-group"><label class="label">Logistics / schedule (time, location, reminders)</label>
-      <input type="text" id="wsc-${wk}" class="input" placeholder="${isGame?'e.g. Saturday 11am at Riverside Park, Field 3':'e.g. Training Mon 6pm + Wed 6pm · Game Saturday 10am'}">
-    </div>`;
+    const training=relevantSessions.filter(s=>s.session_objective!=='Game Day'&&!s.session_objective?.startsWith('GAMEDAY'));
+    const games=relevantSessions.filter(s=>s.session_objective==='Game Day'||s.session_objective?.startsWith('GAMEDAY'));
+    let info='';
+    if(relevantSessions.length){
+      info='<div class="alert alert-success" style="margin-bottom:10px"><strong>✓ '+training.length+' training session'+(training.length!==1?'s':'')+' + '+games.length+' game report'+(games.length!==1?'s':'')+' found</strong><br>'+relevantSessions.map(s=>'· '+(s.title||'Session')).join('<br>')+'</div>';
+    } else {
+      info='<div class="alert alert-warn" style="margin-bottom:10px"><strong>No sessions found for this week yet.</strong> Upload a session first for best results — or click Generate and add context below.</div>';
+    }
+    const ph=isGame?'e.g. Game is at home Saturday 11am. Missing two players. Cold weather — remind parents to bring layers.':'e.g. We have two sessions this week. Working on transitions. Bradley has been putting in great effort.';
+    const logph=isGame?'e.g. Saturday 11am at Riverside Park, Field 3':'e.g. Training Mon 6pm + Wed 6pm · Game Saturday 10am';
+    return info
+      +'<div class="form-group"><label class="label">Additional context (optional)</label>'
+      +'<textarea id="wctx-'+wk+'" class="input" placeholder="'+ph+'" style="min-height:65px"></textarea></div>'
+      +'<div class="form-group"><label class="label">Logistics / schedule</label>'
+      +'<input type="text" id="wsc-'+wk+'" class="input" placeholder="'+logph+'" value="'+(e.schedule||'')+'"></div>';
   },
-
   setEmailType(wk,type){
     const e=State.weeklyEmails[wk]||{};
     e.email_type=type;
     State.weeklyEmails[wk]=e;
     const formEl=$(`et-form-${wk}`);
-    if(formEl)formEl.innerHTML=Team.emailHints(wk,type==='pregame');
+    if(formEl)formEl.innerHTML=Team.emailHintsStatic(wk,type==='pregame',e);
     const tabs=$(`wb-${wk}`)?.querySelectorAll('.tab-btn');
     if(tabs){tabs[0].classList.toggle('active',type==='monday');tabs[1].classList.toggle('active',type==='pregame');}
   },
