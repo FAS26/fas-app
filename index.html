@@ -2262,7 +2262,7 @@ const Director={
           </div>
           <div style="display:flex;gap:6px;align-items:center">
             <div style="width:14px;height:38px;border-radius:3px;background:${daysSinceContact<=7?'#22c55e':daysSinceContact<=14?'#f59e0b':'#ef4444'};opacity:.85"></div>
-            <div class="grade ${Sessions.gradeClass(latestGrade)}" style="width:30px;height:30px;font-size:13px">${latestGrade}</div>
+            <div class="grade ${Sessions.gc(latestGrade)}" style="width:30px;height:30px;font-size:13px">${latestGrade}</div>
             <span style="font-size:11px;color:var(--lime);font-weight:600">View →</span>
           </div>
         </div>`).join('')}
@@ -2285,7 +2285,8 @@ const Director={
     const training=(sessions||[]).filter(s=>!s.session_objective?.startsWith('GAMEDAY'));
     const games=(sessions||[]).filter(s=>s.session_objective?.startsWith('GAMEDAY'));
     const sorted=[...training].sort((a,b)=>new Date(a.date)-new Date(b.date));
-    const fw=getAgeFramework(coach.age_group||'U13');
+    const _fw=Framework.getAgeContext(coach.age_group||'U13');
+    const fw={phase:_fw.phase,qiTarget:_fw.targets?.qi||0.5,pcTarget:_fw.targets?.pc||3};
 
     // Top strengths — from encouragement text
     const avgQI=training.length?training.reduce((a,s)=>a+parseFloat(s.qi_ratio||0),0)/training.length:0;
@@ -2334,7 +2335,7 @@ const Director={
             <div class="card-title">Session Grades</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;padding:4px 0">
               ${training.map(s=>`<div style="text-align:center">
-                <div class="grade ${Sessions.gradeClass(s.grade)}" style="width:36px;height:36px;font-size:14px">${s.grade||'—'}</div>
+                <div class="grade ${Sessions.gc(s.grade)}" style="width:36px;height:36px;font-size:14px">${s.grade||'—'}</div>
                 <div style="font-size:10px;color:var(--text-faint);margin-top:3px">${s.date?.slice(5)||''}</div>
               </div>`).join('')}
             </div>
@@ -2356,7 +2357,7 @@ const Director={
               let acts=[];try{acts=typeof s.actions==='string'&&s.actions.startsWith('[')?JSON.parse(s.actions):[];}catch(e){}
               return`<div style="border:1px solid var(--border);border-radius:var(--radius-xs);padding:14px;margin-bottom:8px">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:${acts.length||s.focus_area_1?'10px':'0'}">
-                  <div class="grade ${Sessions.gradeClass(s.grade)}" style="width:30px;height:30px;font-size:13px">${s.grade||'—'}</div>
+                  <div class="grade ${Sessions.gc(s.grade)}" style="width:30px;height:30px;font-size:13px">${s.grade||'—'}</div>
                   <div style="flex:1">
                     <div style="font-size:13px;font-weight:600">${s.title||'Session'}</div>
                     <div style="font-size:11px;color:var(--text-muted)">${s.date||''} · Q:I ${parseFloat(s.qi_ratio||0).toFixed(2)} · P:C ${parseFloat(s.pc_ratio||0).toFixed(2)}</div>
