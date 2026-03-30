@@ -598,6 +598,7 @@ const Auth={
   showLogin(){$('signupPage').style.display='none';$('loginPage').style.display='flex';},
 
   async signup(){
+    try{
     hideErr('signupErr');
     const first=$('su-first').value.trim(),last=$('su-last').value.trim(),
           email=$('su-email').value.trim(),pw=$('su-pw').value,
@@ -616,15 +617,18 @@ const Auth={
       if(clubRow)await sb.from('profiles').update({club_id:clubRow.id}).eq('id',data.user.id);
     }
     await App.boot(data.user);
+    }catch(err){showErr('signupErr','Error: '+err.message);}
   },
 
   async login(){
+    try{
     hideErr('loginErr');
     const email=$('li-email').value.trim(),pw=$('li-pw').value;
     if(!email||!pw){showErr('loginErr','Please enter your email and password.');return;}
     const{data,error}=await sb.auth.signInWithPassword({email,password:pw});
     if(error){showErr('loginErr',error.message);return;}
     await App.boot(data.user);
+    }catch(err){showErr('loginErr','Error: '+err.message);}
   },
 
   async logout(){await sb.auth.signOut();location.reload();}
