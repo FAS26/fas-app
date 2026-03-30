@@ -1735,7 +1735,7 @@ Write a reflection. Share it with someone who will challenge you.`},
           +'<div style="margin-top:7px;background:var(--lime-pale);border:1px solid #bbf7d0;border-radius:6px;padding:11px 13px;font-size:12px;line-height:1.65;white-space:pre-line;color:#0a0a0a">'+item.prompt+'</div></details>';
       }
       return '<div class="roadmap-item '+(isChecked?'checked':'')+'">'
-        +'<div class="check-circle '+(isChecked?'checked':'')+'" onclick="Team.toggleRoadmap(''+key+'')">'+checkSvg+'</div>'
+        +'<div class="check-circle '+(isChecked?'checked':'')+'" onclick="Team.toggleRoadmap(\''+key+'\')">'+checkSvg+'</div>'
         +'<div style="flex:1">'
           +'<div style="margin-bottom:3px">'+catSpan+essSpan+'</div>'
           +'<div style="font-size:13px;font-weight:600;margin-bottom:3px;'+strikeStyle+'">'+item.title+'</div>'
@@ -1782,8 +1782,8 @@ Write a reflection. Share it with someone who will challenge you.`},
         +'</div>'
         +'<div class="week-body" id="wb-'+wk+'">'
           +'<div class="tabs" style="margin-bottom:12px">'
-            +'<button class="tab-btn '+monday_active+'" onclick="Team.setEmailType('+wk+','monday')">📅 Monday Email</button>'
-            +'<button class="tab-btn '+pregame_active+'" onclick="Team.setEmailType('+wk+','pregame')">🏟️ Pre-Game Email</button>'
+            +'<button class="tab-btn '+monday_active+'" onclick="Team.setEmailType('+wk+',\'monday\')">📅 Monday Email</button>'
+            +'<button class="tab-btn '+pregame_active+'" onclick="Team.setEmailType('+wk+',\'pregame\')">🏟️ Pre-Game Email</button>'
           +'</div>'
           +'<div id="et-form-'+wk+'">'
             +Team.emailHintsStatic(wk,isGame,e)
@@ -1876,16 +1876,13 @@ Write a reflection. Share it with someone who will challenge you.`},
   },
 
   async generateEmailAI(wk){
-    const isGame=State.weeklyEmails[wk]?.email_type==='pregame';
-    const context=$(`wctx-${wk}`)?.value?.trim()||'';
-    const schedule=$(`wsc-${wk}`)?.value?.trim()||'';
-    const ep=$(`ep-${wk}`),eb=$(`et-body-${wk}`);
-
-    // Show loading
+    const isGame=(State.weeklyEmails[wk]?.email_type==='pregame');
+    const context=(document.getElementById('wctx-'+wk)?.value||'').trim();
+    const schedule=(document.getElementById('wsc-'+wk)?.value||'').trim();
+    const ep=document.getElementById('ep-'+wk);
+    const eb=document.getElementById('et-body-'+wk);
     if(ep)ep.style.display='block';
-    if(eb){eb.value='Generating email from your sessions…';eb.style.opacity='0.5';}
-
-    // Get relevant sessions for this week
+    if(eb){eb.value='Generating…';eb.style.opacity='0.5';}
     const startDateStr=State.settings.seasonStartDate||'';
     const startDate=startDateStr?new Date(startDateStr):null;
     let weekSessions=[];
@@ -1894,210 +1891,39 @@ Write a reflection. Share it with someone who will challenge you.`},
       const wkEnd=new Date(wkStart);wkEnd.setDate(wkEnd.getDate()+6);
       weekSessions=State.sessions.filter(s=>{const d=new Date(s.date||s.created_at);return d>=wkStart&&d<=wkEnd;});
     }
-    // If no date set, use last 2 sessions
-    if(!weekSessions.length){
-      weekSessions=State.sessions.slice(0,2);
-    }
-
-    const trainingSessions=weekSessions.filter(s=>!s.session_objective?.startsWith('GAMEDAY')&&s.session_objective!=='Game Day');
-    const gameDays=weekSessions.filter(s=>s.session_objective?.startsWith('GAMEDAY')||s.session_objective==='Game Day');
-
-    // Get previous emails to match writing style
-    const prevEmails=Object.values(State.weeklyEmails).filter(e=>e.body&&e.week<wk).slice(-3);
-    const styleExamples=prevEmails.map(e=>e.body).join('
-
----
-
-');
-
-    // Build session summaries (no raw transcripts — just the AI analysis)
-    const sessionSummaries=trainingSessions.map(s=>`Training session: "${s.title}" (${s.date||''})
-Focus areas: ${s.focus_area_1||''}${s.focus_area_2?', '+s.focus_area_2:''}
-What went well: ${s.encouragement||''}
-Grade: ${s.grade||''}
-Age group: ${s.age_group||''}`).join('
-
-');
-
-    const gameSummaries=gameDays.map(s=>`Game day: "${s.title}" (${s.date||''})
-What went well: ${s.encouragement||''}
-Focus areas: ${s.focus_area_1||''}${s.focus_area_2?', '+s.focus_area_2:''}
-Grade: ${s.grade||''}`).join('
-
-');
-
-    const coachFirstName=State.profile?.first_name||coachName();
+    if(!weekSessions.length)weekSessions=State.sessions.slice(0,2);
+    const training=weekSessions.filter(s=>s.session_objective!=='Game Day'&&!s.session_objective?.startsWith('GAMEDAY'));
+    const games=weekSessions.filter(s=>s.session_objective==='Game Day'||s.session_objective?.startsWith('GAMEDAY'));
+    const prevBodies=Object.values(State.weeklyEmails).filter(e=>e.body&&e.week<wk).slice(-3).map(e=>e.body);
+    const styleSample=prevBodies.join(' | ');
     const name=coachName();
-    const vals=State.values.length?'Team values: '+State.values.join(', '):'';
-
-    const prompt=`You are writing a parent email for ${name}, a football/soccer coach.
-
-EMAIL TYPE: ${isGame?'Pre-Game email — what parents should look for on match day':'Monday email — looking back at the game, looking forward to training this week'}
-
-${sessionSummaries?`TRAINING SESSIONS THIS WEEK:
-${sessionSummaries}
-`:''}
-${gameSummaries?`GAME DAY REPORT:
-${gameSummaries}
-`:''}
-${vals}
-${schedule?`Logistics: ${schedule}`:''}
-${context?`Additional context from coach: ${context}`:''}
-
-${styleExamples?`PREVIOUS EMAILS FROM THIS COACH (match their writing style exactly):
-${styleExamples}`:''}
-
-WRITING RULES — follow these exactly:
-1. Write in flowing paragraphs — NO headers, NO bullet points, NO all-caps section titles
-2. Conversational and warm — like a letter from someone who genuinely cares
-3. Development-focused — never just about the result, always about growth
-4. Normalise mistakes — they are part of the process
-5. Include sideline guidance naturally woven into the text — encourage without directing
-6. Reference the team values naturally if relevant: ${vals}
-7. If there was a game report, open with a genuine reflection on what you observed
-8. If there are training sessions, explain what you are working on and WHY so parents understand
-9. End with "Thank you for all that you do!" and the coach's name: ${name}
-10. Start with "Hi everyone,"
-11. Maximum 3 paragraphs — keep it readable
-12. ${isGame?'Focus on what parents will see — help them watch intelligently. Tell them what you are hoping the players try, and that mistakes are part of the process. Remind them the best thing they can do is encourage without directing.':'Look back at the game Saturday with genuine warmth, then look forward to training this week.'}
-
-Write ONLY the email text — nothing else. No subject line. No commentary.`;
-
+    const vals=State.values.length?State.values.join(', '):'';
+    const tSummary=training.map(s=>'Session: '+s.title+'. Focus: '+(s.focus_area_1||'')+'. '+( s.encouragement||'')).join(' ');
+    const gSummary=games.map(s=>'Game: '+s.title+'. '+(s.encouragement||'')).join(' ');
+    let p='Write a parent email for coach '+name+'. ';
+    p+=isGame?'Type: Pre-Game (what to look for match day). ':'Type: Monday (reflect on game, preview training). ';
+    if(tSummary)p+='Training this week: '+tSummary+'. ';
+    if(gSummary)p+='Game report: '+gSummary+'. ';
+    if(vals)p+='Team values: '+vals+'. ';
+    if(schedule)p+='Logistics: '+schedule+'. ';
+    if(context)p+='Extra: '+context+'. ';
+    if(styleSample)p+='Match this writing style: '+styleSample.slice(0,400)+'. ';
+    p+='Rules: flowing paragraphs only, no headers or bullets, warm and conversational, development-focused, normalise mistakes. ';
+    p+='Start with Hi everyone, — end with Thank you for all that you do! and '+name+'. Max 3 paragraphs. Write ONLY the email.';
     try{
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
         headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY},
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]})
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:p}]})
       });
-      let body='';
-      if(resp.ok){
-        const data=await resp.json();
-        body=data.content[0].text.trim();
-      } else {
-        body=Team.fallbackEmail(isGame,trainingSessions,gameDays,schedule,context,name);
-      }
+      const body=resp.ok?(await resp.json()).content[0].text.trim():Team.fallbackEmail(isGame,training,games,schedule,context,name);
       if(eb){eb.value=body;eb.style.opacity='1';}
       State.weeklyEmails[wk]={...State.weeklyEmails[wk],body,email_type:isGame?'pregame':'monday'};
       await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,body,email_type:isGame?'pregame':'monday'},{onConflict:'user_id,week'});
     }catch(e){
-      const body=Team.fallbackEmail(isGame,trainingSessions,gameDays,schedule,context,name);
+      const body=Team.fallbackEmail(isGame,training,games,schedule,context,name);
       if(eb){eb.value=body;eb.style.opacity='1';}
     }
-  },
-
-  fallbackEmail(isGame,trainingSessions,gameDays,schedule,context,name){
-    const game=gameDays[0];const session=trainingSessions[0];
-    if(isGame){
-      let b='Hi everyone,
-
-';
-      if(session){b+=`This week in training we have been working on ${session.focus_area_1||session.title||'our session objectives'}. It has been great to see the effort and growth that has come with it.
-
-`;}
-      b+=`I am really looking forward to watching the team compete${schedule?' — '+schedule:''}. As always there will be moments that go well and moments that are a work in progress. That is the nature of development and it is exactly what we want to see.
-
-`;
-      b+=`The best thing you can do on the sideline is be encouraging without providing direction. It is important that the players are able to communicate their own ideas on the field and learn through their own experience.
-
-`;
-      b+=`Thank you for all that you do!
-
-${name}`;
-      return b;
-    }
-    let b='Hi everyone,
-
-';
-    if(game){b+=`${game.encouragement||'It was great to watch the team on Saturday. They are developing well and it shows in the way they are playing.'}
-
-`;}
-    if(session){b+=`This week we are going to focus on ${session.focus_area_1||session.title||'continuing our development'}. ${session.focus_area_2?'We will also be working on '+session.focus_area_2+'. ':''}`;}
-    if(context){b+=context+' ';}
-    if(b.length>60){b+='
-
-';}
-    b+=`Thank you for all that you do!
-
-${name}`;
-    return b;
-  },
-
-  async markSent(wk){
-    State.weeklyEmails[wk]={...State.weeklyEmails[wk],sent:true};
-    await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,sent:true},{onConflict:'user_id,week'});
-    Team.renderEmails();
-  },
-
-  // ── PLAYERS ──────────────────────────────────────────────────────────────────
-  renderPlayers(){
-    State.currentSubSection='players';
-    const roster=State.roster,interactions=State.interactions,checkins=State.checkins;
-    const sum={};
-    roster.forEach(p=>{sum[p.name]={praise:0,reinforcement:0,feedback:0,correction:0,total:0,lastCheckin:null};});
-    interactions.forEach(i=>{if(!sum[i.player_name])return;sum[i.player_name][i.type]=(sum[i.player_name][i.type]||0)+1;sum[i.player_name].total++;});
-    checkins.forEach(c=>{if(!sum[c.player_name])return;if(!sum[c.player_name].lastCheckin||c.date>sum[c.player_name].lastCheckin)sum[c.player_name].lastCheckin=c.date;});
-    const maxT=Math.max(...Object.values(sum).map(s=>s.total),1);
-    const today=new Date();
-    const needsCI=roster.filter(p=>{const lc=sum[p.name]?.lastCheckin;return!lc||(today-new Date(lc))/(864e5)>21;});
-
-    setMain(`
-    <div class="page-header">
-      <div><h1>Players</h1><p>Interaction heatmap · Check-ins · 3-week alerts</p></div>
-      <button class="btn btn-sm" onclick="openModal('logInteractionModal')">+ Log Interaction</button>
-    </div>
-    <div class="page-body">
-      ${needsCI.length?`<div class="alert alert-warn"><strong>⚠ Check-in needed:</strong> ${needsCI.map(p=>p.name).join(', ')} — no check-in in the last 3 weeks.</div>`:''}
-      <div class="card" style="margin-bottom:12px">
-        <div class="card-header">
-          <div class="card-title">Interaction Heatmap</div>
-          <div style="display:flex;gap:10px;font-size:11px;color:var(--text-muted)">
-            <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#22c55e;margin-right:3px"></span>Praise</span>
-            <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#84cc16;margin-right:3px"></span>Reinforce</span>
-            <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#3b82f6;margin-right:3px"></span>Feedback</span>
-            <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#ef4444;margin-right:3px"></span>Correction</span>
-          </div>
-        </div>
-        ${!roster.length?`<p style="font-size:13px;color:var(--text-muted);text-align:center;padding:20px">Add players in the Team tab to see the heatmap.</p>`:''}
-        ${roster.map(p=>{
-          const s=sum[p.name]||{praise:0,reinforcement:0,feedback:0,correction:0,total:0};
-          const sc=180/maxT;
-          const days=s.lastCheckin?Math.floor((today-new Date(s.lastCheckin))/864e5):null;
-          const needCI=days===null||days>21;
-          return`<div class="heatmap-row">
-            <div class="heatmap-name">${p.name}</div>
-            <div class="heatmap-bars">
-              ${s.praise>0?`<div class="heatmap-seg" style="width:${Math.max(5,s.praise*sc)}px;background:#22c55e"></div>`:''}
-              ${s.reinforcement>0?`<div class="heatmap-seg" style="width:${Math.max(5,s.reinforcement*sc)}px;background:#84cc16"></div>`:''}
-              ${s.feedback>0?`<div class="heatmap-seg" style="width:${Math.max(5,s.feedback*sc)}px;background:#3b82f6"></div>`:''}
-              ${s.correction>0?`<div class="heatmap-seg" style="width:${Math.max(5,s.correction*sc)}px;background:#ef4444"></div>`:''}
-              ${s.total===0?`<span style="font-size:11px;color:var(--text-faint)">No interactions recorded</span>`:''}
-              <span style="font-size:11px;color:var(--text-faint);margin-left:6px">${s.total}</span>
-            </div>
-            ${needCI?`<span style="font-size:10px;color:var(--red);font-weight:600;flex-shrink:0">Check-in needed</span>`:`<span style="font-size:10px;color:var(--text-faint);flex-shrink:0">${days===0?'Today':days+'d ago'}</span>`}
-          </div>`;
-        }).join('')}
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Individual Check-ins</div><span style="font-size:12px;color:var(--text-muted)">Every 3 weeks minimum</span></div>
-        ${roster.map(p=>{
-          const playerCI=checkins.filter(c=>c.player_name===p.name);
-          const latest=playerCI[0];
-          return`<div style="border:1px solid var(--border);border-radius:var(--radius-xs);padding:12px;margin-bottom:8px">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-              <div style="width:26px;height:26px;border-radius:50%;background:var(--dark);color:var(--lime);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">${p.number||'—'}</div>
-              <div style="flex:1;font-weight:600">${p.name}</div>
-              ${latest?`<span style="font-size:11px;color:var(--text-muted)">Last: ${latest.date}</span>`:`<span class="badge badge-red">No check-in</span>`}
-            </div>
-            ${latest?`<p style="font-size:12px;color:var(--text-muted);background:var(--lime-pale);padding:7px 10px;border-radius:var(--radius-xs);margin-bottom:7px;line-height:1.5">${latest.notes||'No notes'}</p>`:''}
-            <div style="display:flex;gap:8px">
-              <textarea id="ci-${esc(p.name)}" class="input" placeholder="Check-in notes — what did you discuss?" style="min-height:55px;font-size:12px"></textarea>
-              <button class="btn btn-primary btn-sm" style="flex-shrink:0;align-self:flex-end" onclick="Team.saveCheckin('${esc(p.name)}')">Save</button>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`);
-    $('li-player').innerHTML=roster.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
   },
 
   async saveCheckin(pn){
@@ -2283,113 +2109,6 @@ ${name}`;
     }).catch(()=>{
       el.select();document.execCommand('copy');alert('Email copied!');
     });
-  },
-
-  async generateEmailAI(wk){
-    const isGame=(State.weeklyEmails[wk]?.email_type==='pregame');
-    const context=(document.getElementById('wctx-'+wk)?.value||'').trim();
-    const schedule=(document.getElementById('wsc-'+wk)?.value||'').trim();
-    const ep=document.getElementById('ep-'+wk);
-    const eb=document.getElementById('et-body-'+wk);
-    if(ep)ep.style.display='block';
-    if(eb){eb.value='Generating email from your sessions…';eb.style.opacity='0.5';}
-
-    const startDateStr=State.settings.seasonStartDate||'';
-    const startDate=startDateStr?new Date(startDateStr):null;
-    let weekSessions=[];
-    if(startDate){
-      const wkStart=new Date(startDate);wkStart.setDate(wkStart.getDate()+(wk-1)*7);
-      const wkEnd=new Date(wkStart);wkEnd.setDate(wkEnd.getDate()+6);
-      weekSessions=State.sessions.filter(s=>{const d=new Date(s.date||s.created_at);return d>=wkStart&&d<=wkEnd;});
-    }
-    if(!weekSessions.length)weekSessions=State.sessions.slice(0,2);
-
-    const training=weekSessions.filter(s=>s.session_objective!=='Game Day'&&!s.session_objective?.startsWith('GAMEDAY'));
-    const games=weekSessions.filter(s=>s.session_objective==='Game Day'||s.session_objective?.startsWith('GAMEDAY'));
-    const prevEmails=Object.values(State.weeklyEmails).filter(e=>e.body&&e.week<wk).slice(-3);
-    const styleExamples=prevEmails.map(e=>e.body).join('
-
----
-
-');
-    const name=coachName();
-
-    const sessionSummaries=training.map(s=>'Training: "'+s.title+'" ('+s.date+')
-Focus: '+(s.focus_area_1||'')+', '+(s.focus_area_2||'')+'
-What went well: '+(s.encouragement||'')).join('
-
-');
-    const gameSummaries=games.map(s=>'Game: "'+s.title+'" ('+s.date+')
-What went well: '+(s.encouragement||'')+'
-Focus: '+(s.focus_area_1||'')).join('
-
-');
-    const vals=State.values.length?'Team values: '+State.values.join(', '):'';
-
-    const prompt='You are writing a parent email for '+name+', a football/soccer coach.
-
-'
-      +'EMAIL TYPE: '+(isGame?'Pre-Game email — what parents should look for on match day':'Monday email — looking back at the game, looking forward to training this week')+'
-
-'
-      +(sessionSummaries?'TRAINING THIS WEEK:
-'+sessionSummaries+'
-
-':'')
-      +(gameSummaries?'GAME REPORT:
-'+gameSummaries+'
-
-':'')
-      +(vals?vals+'
-':'')
-      +(schedule?'Logistics: '+schedule+'
-':'')
-      +(context?'Extra context: '+context+'
-':'')
-      +(styleExamples?'
-PREVIOUS EMAILS — match this writing style:
-'+styleExamples+'
-
-':'')
-      +'RULES:
-'
-      +'1. Write in flowing paragraphs — NO headers, NO bullet points, NO all-caps titles
-'
-      +'2. Warm and conversational — like a genuine letter
-'
-      +'3. Development-focused — never just about the result
-'
-      +'4. Normalise mistakes — they are part of the process
-'
-      +'5. Weave in sideline guidance naturally — encourage without directing
-'
-      +'6. Start with "Hi everyone,"
-'
-      +'7. End with "Thank you for all that you do!" and "'+name+'"
-'
-      +'8. Maximum 3 paragraphs
-'
-      +'9. '+(isGame?'Tell parents what to look for and remind them to encourage without directing.':'Look back at game Saturday then look forward to training this week.')+'
-
-'
-      +'Write ONLY the email text.';
-
-    try{
-      const resp=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY},
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]})
-      });
-      let body='';
-      if(resp.ok){const data=await resp.json();body=data.content[0].text.trim();}
-      else body=Team.fallbackEmail(isGame,training,games,schedule,context,name);
-      if(eb){eb.value=body;eb.style.opacity='1';}
-      State.weeklyEmails[wk]={...State.weeklyEmails[wk],body,email_type:isGame?'pregame':'monday'};
-      await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,body,email_type:isGame?'pregame':'monday'},{onConflict:'user_id,week'});
-    }catch(err){
-      const body=Team.fallbackEmail(isGame,training,games,schedule,context,name);
-      if(eb){eb.value=body;eb.style.opacity='1';}
-    }
   },
 
   async saveCheckin(pn){
