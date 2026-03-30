@@ -1945,6 +1945,334 @@ Write a reflection. Share it with someone who will challenge you.`},
   },
 
   // ── ROSTER / TEAM ─────────────────────────────────────────────────────────────
+  // ── PLAYERS ─────────────────────────────────────────────────────────────────
+  renderPlayers(){
+    State.currentSubSection='players';
+    const roster=State.roster||[];
+    const interactions=State.interactions||[];
+    const checkins=State.checkins||[];
+    const today=new Date();
+    const conn={};
+    roster.forEach(p=>{
+      const pi=interactions.filter(i=>i.player_name===p.name);
+      const pc=checkins.filter(c=>c.player_name===p.name);
+      const lastInt=pi.length?new Date(pi.slice(-1)[0].date||pi.slice(-1)[0].created_at):null;
+      const lastCI=pc.length?new Date(pc[0].date||pc[0].created_at):null;
+      const lastContact=lastInt&&lastCI?new Date(Math.max(lastInt,lastCI)):lastInt||lastCI;
+      const daysSince=lastContact?Math.floor((today-lastContact)/864e5):null;
+      conn[p.name]={pi,pc,praise:pi.filter(i=>i.type==='praise').length,reinforcement:pi.filter(i=>i.type==='reinforcement').length,feedback:pi.filter(i=>i.type==='feedback').length,correction:pi.filter(i=>i.type==='correction').length,total:pi.length,daysSince,needsCheckin:daysSince===null||daysSince>21};
+    });
+    const maxInt=Math.max(1,...Object.values(conn).map(c=>c.total));
+    const needsCI=roster.filter(p=>conn[p.name]?.needsCheckin);
+
+    if(!roster.length){
+      setMain('<div class="page-header"><div><h1>Players</h1></div><button class="btn btn-primary btn-sm" onclick="Team.showAddPlayer()">+ Add Player</button></div><div class="page-body"><div class="card" style="text-align:center;padding:40px"><div style="font-size:32px;margin-bottom:12px">&#128101;</div><div style="font-weight:600;margin-bottom:6px">No players yet</div><div style="color:var(--text-muted);font-size:13px;margin-bottom:16px">Add your roster to track connections and stats</div><button class="btn btn-primary" onclick="Team.showAddPlayer()">Add First Player</button></div></div>');
+      return;
+    }
+
+    // Build heatmap rows
+    const heatRows=roster.map(p=>{
+      const c=conn[p.name];
+      const sc=c.total?Math.min(180,(c.total/maxInt)*180):0;
+      const days=c.daysSince;
+      const ciColor=days===null||days>21?'#ef4444':days>14?'#fbbf24':'#22c55e';
+      const ciLabel=days===null?'Never':days===0?'Today':days+'d ago';
+      const pn=p.name.replace(/"/g,'&quot;');
+      return '<div class="heatmap-row" style="cursor:pointer" onclick="Team.openPlayer(this)"  data-player="'+pn+'">'
+        +'<div class="heatmap-name">'+p.name+(p.number?' #'+p.number:'')+'</div>'
+        +'<div class="heatmap-bar"><div style="display:flex;height:14px;border-radius:4px;overflow:hidden;width:'+sc+'px">'
+        +'<div style="flex:'+c.praise+';background:#22c55e"></div>'
+        +'<div style="flex:'+c.reinforcement+';background:#84cc16"></div>'
+        +'<div style="flex:'+c.feedback+';background:#3b82f6"></div>'
+        +'<div style="flex:'+c.correction+';background:#ef4444"></div>'
+        +'</div></div>'
+        +'<div style="font-size:11px;font-weight:600;color:'+ciColor+';flex-shrink:0;width:70px;text-align:right">'+ciLabel+'</div>'
+        +'<div style="font-size:11px;color:var(--lime);margin-left:6px">&#8250;</div>'
+        +'</div>';
+    }).join('');
+
+    // Build player cards
+    const playerCards=roster.map(p=>{
+      const c=conn[p.name];
+      const stats=p.stats||{goals:0,assists:0,saves:0,gamesPlayed:0,gamesStarted:0,minutesPlayed:0};
+      const ppos=p.positions_played||[];
+      const safeId='pc-'+p.name.replace(/[^a-zA-Z0-9]/g,'_');
+      const pn=p.name.replace(/"/g,'&quot;');
+      const statItems=[
+        {k:'goals',l:'Goals',s:'tap to edit'},
+        {k:'assists',l:'Assists',s:'tap to edit'},
+        {k:'saves',l:'Saves',s:'tap to edit'},
+        {k:'gamesPlayed',l:'Games',s:'played'},
+        {k:'gamesStarted',l:'Started',s:'games'},
+        {k:'minutesPlayed',l:'Minutes',s:'played'},
+      ];
+      const statsHtml=statItems.map(si=>'<div class="metric-card" style="cursor:pointer" onclick="Team.editStat(this)" data-player="'+pn+'" data-stat="'+si.k+'" data-val="'+(stats[si.k]||0)+'">'
+        +'<div class="metric-label">'+si.l+'</div>'
+        +'<div class="metric-value">'+(stats[si.k]||0)+'</div>'
+        +'<div class="metric-sub">'+si.s+'</div>'
+        +'</div>').join('');
+      const posHtml=['GK','RB','CB','LB','CDM','CM','CAM','RW','LW','ST'].map(pos=>'<span onclick="Team.togglePosition(this)" data-player="'+pn+'" data-pos="'+pos+'" style="cursor:pointer;font-size:11px;font-weight:600;padding:3px 10px;border-radius:100px;background:'+(ppos.includes(pos)?'var(--lime)':'var(--border)')+';color:'+(ppos.includes(pos)?'var(--dark-deep)':'var(--text-muted)')+'">'+pos+'</span>').join('');
+      const ciHtml=c.pc.slice(0,3).map(ci=>'<div style="font-size:12px;color:var(--text-muted);margin-bottom:3px"><span style="color:var(--lime-muted)">'+ci.date+'</span> &#8212; '+ci.notes+'</div>').join('');
+      return '<div class="card" id="'+safeId+'" style="margin-bottom:10px;display:none">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+          +'<div style="font-weight:700;font-size:15px">'+p.name+(p.number?' <span style=\"color:var(--text-muted);font-weight:normal\">#'+p.number+'</span>':'')+'</div>'
+          +'<button onclick="Team.deletePlayer(this)" data-id="'+p.id+'" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">&#215;</button>'
+        +'</div>'
+        +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">'+statsHtml+'</div>'
+        +'<div style="margin-bottom:12px"><label class="label">Positions Played</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+posHtml+'</div></div>'
+        +'<div style="border-top:1px solid var(--border);padding-top:12px">'
+          +'<div style="font-size:12px;font-weight:600;margin-bottom:6px">Check-in Notes</div>'
+          +ciHtml
+          +'<div style="display:flex;gap:8px;margin-top:8px">'
+            +'<textarea class="input player-ci" data-player="'+pn+'" placeholder="How is this player doing?" style="min-height:50px;flex:1"></textarea>'
+            +'<button class="btn btn-primary btn-sm" onclick="Team.saveCheckinEl(this)" data-player="'+pn+'" style="align-self:flex-end">Save</button>'
+          +'</div>'
+        +'</div>'
+        +'</div>';
+    }).join('');
+
+    const ciAlert=needsCI.length?'<div class="alert alert-warn" style="margin-bottom:14px"><strong>&#9888; Check-in needed:</strong> '+needsCI.map(p=>p.name).join(', ')+'</div>':'';
+
+    setMain('<div class="page-header">'
+      +'<div><h1>Players</h1><p>Roster &#183; Connection heatmap &#183; Stats &#183; Playing time</p></div>'
+      +'<div style="display:flex;gap:8px">'
+        +'<button class="btn btn-primary btn-sm" onclick="Team.showAddPlayer()">+ Add Player</button>'
+        +'<button class="btn btn-sm" onclick="openModal(\'logInteractionModal\')">Log Interaction</button>'
+      +'</div></div>'
+      +'<div class="page-body">'
+        +ciAlert
+        +'<div class="card" style="margin-bottom:14px">'
+          +'<div class="card-header"><div class="card-title">Connection Heatmap</div>'
+          +'<div style="display:flex;gap:10px;font-size:11px;color:var(--text-muted)">'
+            +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#22c55e;margin-right:3px"></span>Praise</span>'
+            +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#84cc16;margin-right:3px"></span>Reinforce</span>'
+            +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#3b82f6;margin-right:3px"></span>Feedback</span>'
+            +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#ef4444;margin-right:3px"></span>Correction</span>'
+          +'</div></div>'
+          +heatRows
+        +'</div>'
+        +'<div id="playerCards">'+playerCards+'</div>'
+      +'</div>');
+
+    const liPlayer=document.getElementById('li-player');
+    if(liPlayer)liPlayer.innerHTML=roster.map(p=>'<option value="'+p.name.replace(/"/g,'&quot;')+'">'+p.name+'</option>').join('');
+  },
+
+  openPlayer(el){
+    const name=el.dataset.player;
+    const safeId='pc-'+name.replace(/[^a-zA-Z0-9]/g,'_');
+    const card=document.getElementById(safeId);
+    if(!card)return;
+    const isOpen=card.style.display!=='none';
+    document.querySelectorAll('[id^="pc-"]').forEach(e=>e.style.display='none');
+    if(!isOpen)card.style.display='block';
+  },
+
+  showAddPlayer(){
+    const m=document.getElementById('addPlayerModal');
+    if(!m)return;
+    m.querySelector('.modal-content').innerHTML='<div class="modal-body">'
+      +'<h3 style="margin-bottom:16px">Add Player</h3>'
+      +'<div class="form-group"><label class="label">Name</label><input id="ap-name" class="input" placeholder="Full name"></div>'
+      +'<div class="form-group"><label class="label">Number</label><input id="ap-num" class="input" type="number" placeholder="#"></div>'
+      +'<div class="form-group"><label class="label">Position</label>'
+        +'<select id="ap-pos" class="input"><option value="">Select</option>'
+        +'<option>GK</option><option>RB</option><option>CB</option><option>LB</option>'
+        +'<option>CDM</option><option>CM</option><option>CAM</option><option>RW</option><option>LW</option><option>ST</option>'
+        +'</select></div>'
+      +'<div style="display:flex;gap:8px;margin-top:16px">'
+        +'<button class="btn btn-primary" onclick="Team.addPlayer()">Add Player</button>'
+        +'<button class="btn" onclick="closeModal(\'addPlayerModal\')">Cancel</button>'
+      +'</div></div>';
+    openModal('addPlayerModal');
+  },
+
+  async addPlayer(){
+    const name=document.getElementById('ap-name')?.value?.trim();
+    const num=document.getElementById('ap-num')?.value?.trim();
+    const pos=document.getElementById('ap-pos')?.value?.trim();
+    if(!name){alert('Please enter a name');return;}
+    const{data,error}=await sb.from('roster').insert({user_id:State.user.id,coach_name:coachName(),name,number:num||'',position:pos||'',stats:{goals:0,assists:0,saves:0,gamesPlayed:0,gamesStarted:0,minutesPlayed:0},positions_played:pos?[pos]:[]}).select().single();
+    if(error){alert('Error: '+error.message);return;}
+    if(data)State.roster.push(data);
+    closeModal('addPlayerModal');
+    Team.renderPlayers();
+  },
+
+  async deletePlayer(el){
+    const id=el.dataset.id;
+    if(!confirm('Remove this player?'))return;
+    await sb.from('roster').delete().eq('id',id);
+    State.roster=State.roster.filter(p=>p.id!==id);
+    Team.renderPlayers();
+  },
+
+  async editStat(el){
+    const playerName=el.dataset.player;
+    const stat=el.dataset.stat;
+    const current=el.dataset.val||0;
+    const labels={goals:'Goals',assists:'Assists',saves:'Saves',gamesPlayed:'Games Played',gamesStarted:'Games Started',minutesPlayed:'Minutes Played'};
+    const val=prompt('Update '+labels[stat]+' for '+playerName+':',current);
+    if(val===null)return;
+    const player=State.roster.find(p=>p.name===playerName);
+    if(!player)return;
+    player.stats=player.stats||{};
+    player.stats[stat]=parseInt(val)||0;
+    await sb.from('roster').update({stats:player.stats}).eq('id',player.id);
+    Team.renderPlayers();
+    const safeId='pc-'+playerName.replace(/[^a-zA-Z0-9]/g,'_');
+    const card=document.getElementById(safeId);
+    if(card)card.style.display='block';
+  },
+
+  async togglePosition(el){
+    const playerName=el.dataset.player;
+    const pos=el.dataset.pos;
+    const player=State.roster.find(p=>p.name===playerName);
+    if(!player)return;
+    player.positions_played=player.positions_played||[];
+    const idx=player.positions_played.indexOf(pos);
+    if(idx>-1)player.positions_played.splice(idx,1);
+    else player.positions_played.push(pos);
+    await sb.from('roster').update({positions_played:player.positions_played}).eq('id',player.id);
+    Team.renderPlayers();
+    const safeId='pc-'+playerName.replace(/[^a-zA-Z0-9]/g,'_');
+    const card=document.getElementById(safeId);
+    if(card)card.style.display='block';
+  },
+
+  async saveCheckinEl(el){
+    const playerName=el.dataset.player;
+    const ta=el.parentElement.querySelector('.player-ci');
+    const notes=ta?.value?.trim();
+    if(!notes)return;
+    const row={user_id:State.user.id,coach_name:coachName(),player_name:playerName,notes,date:new Date().toISOString().slice(0,10)};
+    const{data}=await sb.from('player_checkins').insert(row).select().single();
+    if(data)State.checkins.unshift(data);
+    Team.renderPlayers();
+    const safeId='pc-'+playerName.replace(/[^a-zA-Z0-9]/g,'_');
+    const card=document.getElementById(safeId);
+    if(card)card.style.display='block';
+  },
+
+  async saveCheckin(playerName){
+    const safeId=playerName.replace(/[^a-zA-Z0-9]/g,'_');
+    const notes=document.getElementById('ci-'+safeId)?.value?.trim();
+    if(!notes)return;
+    const row={user_id:State.user.id,coach_name:coachName(),player_name:playerName,notes,date:new Date().toISOString().slice(0,10)};
+    const{data}=await sb.from('player_checkins').insert(row).select().single();
+    if(data)State.checkins.unshift(data);
+    Team.renderPlayers();
+  },
+
+  async saveInteraction(){
+    const player=document.getElementById('li-player').value;
+    const type=document.getElementById('li-type').value;
+    const note=document.getElementById('li-note').value.trim();
+    if(!player)return;
+    const row={user_id:State.user.id,coach_name:coachName(),player_name:player,type,note,date:new Date().toISOString().slice(0,10),source:'manual'};
+    const{data}=await sb.from('interactions').insert(row).select().single();
+    if(data)State.interactions.push(data);
+    closeModal('logInteractionModal');
+    Team.renderPlayers();
+  },
+
+
+  openPlayer(name){
+    const safeId=name.replace(/\s/g,'_');
+    const el=document.getElementById('pc-'+safeId);
+    if(!el)return;
+    const isOpen=el.style.display!=='none';
+    document.querySelectorAll('[id^="pc-"]').forEach(e=>e.style.display='none');
+    if(!isOpen)el.style.display='block';
+  },
+
+  showAddPlayer(){
+    const m=document.getElementById('addPlayerModal');
+    if(!m)return;
+    m.querySelector('.modal-content').innerHTML='<div class="modal-body">'
+      +'<h3 style="margin-bottom:16px">Add Player</h3>'
+      +'<div class="form-group"><label class="label">Name</label><input id="ap-name" class="input" placeholder="Full name"></div>'
+      +'<div class="form-group"><label class="label">Number</label><input id="ap-num" class="input" type="number" placeholder="#"></div>'
+      +'<div class="form-group"><label class="label">Position</label>'
+        +'<select id="ap-pos" class="input"><option value="">Select</option>'
+        +'<option>GK</option><option>RB</option><option>CB</option><option>LB</option>'
+        +'<option>CDM</option><option>CM</option><option>CAM</option><option>RW</option><option>LW</option><option>ST</option>'
+        +'</select></div>'
+      +'<div style="display:flex;gap:8px;margin-top:16px">'
+        +'<button class="btn btn-primary" onclick="Team.addPlayer()">Add Player</button>'
+        +'<button class="btn" onclick="closeModal(\'addPlayerModal\')">Cancel</button>'
+      +'</div></div>';
+    openModal('addPlayerModal');
+  },
+
+  async addPlayer(){
+    const name=document.getElementById('ap-name')?.value?.trim();
+    const num=document.getElementById('ap-num')?.value?.trim();
+    const pos=document.getElementById('ap-pos')?.value?.trim();
+    if(!name)return;
+    const{data}=await sb.from('roster').insert({user_id:State.user.id,coach_name:coachName(),name,number:num||'',position:pos||'',stats:{goals:0,assists:0,saves:0,gamesPlayed:0,gamesStarted:0,minutesPlayed:0},positions_played:pos?[pos]:[]}).select().single();
+    if(data)State.roster.push(data);
+    closeModal('addPlayerModal');
+    Team.renderPlayers();
+  },
+
+  async deletePlayer(id){
+    if(!confirm('Remove this player?'))return;
+    await sb.from('roster').delete().eq('id',id);
+    State.roster=State.roster.filter(p=>p.id!==id);
+    Team.renderPlayers();
+  },
+
+  async editStat(playerName,stat){
+    const player=State.roster.find(p=>p.name===playerName);
+    if(!player)return;
+    const labels={goals:'Goals',assists:'Assists',saves:'Saves',gamesPlayed:'Games Played',gamesStarted:'Games Started',minutesPlayed:'Minutes Played'};
+    const val=prompt('Update '+labels[stat]+' for '+playerName+':',((player.stats||{})[stat]||0));
+    if(val===null)return;
+    player.stats=player.stats||{};
+    player.stats[stat]=parseInt(val)||0;
+    await sb.from('roster').update({stats:player.stats}).eq('id',player.id);
+    Team.renderPlayers();
+    Team.openPlayer(playerName);
+  },
+
+  async togglePosition(playerName,pos){
+    const player=State.roster.find(p=>p.name===playerName);
+    if(!player)return;
+    player.positions_played=player.positions_played||[];
+    const idx=player.positions_played.indexOf(pos);
+    if(idx>-1)player.positions_played.splice(idx,1);
+    else player.positions_played.push(pos);
+    await sb.from('roster').update({positions_played:player.positions_played}).eq('id',player.id);
+    Team.renderPlayers();
+    Team.openPlayer(playerName);
+  },
+
+  async saveCheckin(playerName){
+    const safeId=playerName.replace(/\s/g,'_');
+    const notes=document.getElementById('ci-'+safeId)?.value?.trim();
+    if(!notes)return;
+    const row={user_id:State.user.id,coach_name:coachName(),player_name:playerName,notes,date:new Date().toISOString().slice(0,10)};
+    const{data}=await sb.from('player_checkins').insert(row).select().single();
+    if(data)State.checkins.unshift(data);
+    Team.renderPlayers();
+    Team.openPlayer(playerName);
+  },
+
+  async saveInteraction(){
+    const player=document.getElementById('li-player').value;
+    const type=document.getElementById('li-type').value;
+    const note=document.getElementById('li-note').value.trim();
+    if(!player)return;
+    const row={user_id:State.user.id,coach_name:coachName(),player_name:player,type,note,date:new Date().toISOString().slice(0,10),source:'manual'};
+    const{data}=await sb.from('interactions').insert(row).select().single();
+    if(data)State.interactions.push(data);
+    closeModal('logInteractionModal');
+    Team.renderPlayers();
+  },
+
+
   renderRoster(){
     State.currentSubSection='roster';
     setMain(`
