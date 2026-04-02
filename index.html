@@ -1816,33 +1816,79 @@ Write a reflection. Share it with someone who will challenge you.`},
   },
 
   emailHintsStatic(wk,isGame,e){
-    // Static version called during renderEmails (no live DOM access)
     const startDateStr=State.settings.seasonStartDate||'';
     const startDate=startDateStr?new Date(startDateStr):null;
-    let relevantSessions=[];
+    let sessions=[];
     if(startDate){
       const wkStart=new Date(startDate);wkStart.setDate(wkStart.getDate()+(wk-1)*7);
       const wkEnd=new Date(wkStart);wkEnd.setDate(wkEnd.getDate()+6);
-      relevantSessions=State.sessions.filter(s=>{const d=new Date(s.date||s.created_at);return d>=wkStart&&d<=wkEnd;});
+      sessions=State.sessions.filter(s=>{const d=new Date(s.date||s.created_at);return d>=wkStart&&d<=wkEnd;});
     } else {
-      relevantSessions=wk===1?State.sessions.slice(0,2):[];
+      sessions=State.sessions.slice(0,2);
     }
-    const training=relevantSessions.filter(s=>s.session_objective!=='Game Day'&&!s.session_objective?.startsWith('GAMEDAY'));
-    const games=relevantSessions.filter(s=>s.session_objective==='Game Day'||s.session_objective?.startsWith('GAMEDAY'));
-    let info='';
-    if(relevantSessions.length){
-      info='<div class="alert alert-success" style="margin-bottom:10px"><strong>✓ '+training.length+' training session'+(training.length!==1?'s':'')+' + '+games.length+' game report'+(games.length!==1?'s':'')+' found</strong><br>'+relevantSessions.map(s=>'· '+(s.title||'Session')).join('<br>')+'</div>';
+    const training=sessions.filter(s=>s.session_objective!=='Game Day'&&!s.session_objective?.startsWith('GAMEDAY'));
+    const games=sessions.filter(s=>s.session_objective==='Game Day'||s.session_objective?.startsWith('GAMEDAY'));
+
+    // Pre-fill from session data where available
+    const gameRecap=games.map(s=>s.encouragement||'').filter(Boolean).join(' ');
+    const trainingFocus=training.map(s=>[s.focus_area_1,s.focus_area_2].filter(Boolean).join(', ')).filter(Boolean).join('; ');
+    const trainingHighlight=training.map(s=>s.encouragement||'').filter(Boolean).join(' ');
+    const savedSchedule=e.schedule||'';
+
+    // Session info banner
+    let banner='';
+    if(sessions.length){
+      const names=sessions.map(s=>'<span style="font-size:11px;background:var(--lime-pale);border:1px solid #bbf7d0;border-radius:4px;padding:1px 6px">'+s.title+'</span>').join(' ');
+      banner='<div style="background:var(--dark);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:12px">'
+        +'<div style="color:var(--lime);font-weight:600;margin-bottom:6px">&#10003; Linked to '+sessions.length+' upload'+(sessions.length>1?'s':'')+' this week</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:4px">'+names+'</div>'
+        +'<div style="color:var(--text-muted);margin-top:6px;font-size:11px">The AI will read these uploads. Fill in anything below that the session recording may not cover.</div>'
+        +'</div>';
     } else {
-      info='<div class="alert alert-warn" style="margin-bottom:10px"><strong>No sessions found for this week yet.</strong> Upload a session first for best results — or click Generate and add context below.</div>';
+      banner='<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#92400e">'
+        +'<strong>No uploads found for this week.</strong> Fill in the prompts below and click Generate — or upload a session first for the best results.'
+        +'</div>';
     }
-    const ph=isGame?'e.g. Game is at home Saturday 11am. Missing two players. Cold weather — remind parents to bring layers.':'e.g. We have two sessions this week. Working on transitions. Bradley has been putting in great effort.';
-    const logph=isGame?'e.g. Saturday 11am at Riverside Park, Field 3':'e.g. Training Mon 6pm + Wed 6pm · Game Saturday 10am';
-    return info
-      +'<div class="form-group"><label class="label">Additional context (optional)</label>'
-      +'<textarea id="wctx-'+wk+'" class="input" placeholder="'+ph+'" style="min-height:65px"></textarea></div>'
-      +'<div class="form-group"><label class="label">Logistics / schedule</label>'
-      +'<input type="text" id="wsc-'+wk+'" class="input" placeholder="'+logph+'" value="'+(e.schedule||'')+'"></div>';
+
+    let fields='';
+    if(isGame){
+      fields=''
+        +'<div class="form-group"><label class="label">What to look for in this match</label>'
+        +'<textarea id="wf-'+wk+'" class="input" style="min-height:70px" placeholder="What are players working on? What should parents watch for? (e.g. pressing high, wide play, our half-time routine)">'+(e.focus||trainingFocus)+'</textarea>'
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Pre-filled from your training uploads if available. Edit freely.</div></div>'
+
+        +'<div class="form-group"><label class="label">How has training gone leading up to this game?</label>'
+        +'<textarea id="wr-'+wk+'" class="input" style="min-height:60px" placeholder="What has the team been working on? What improvements are you seeing?">'+(e.recap||trainingHighlight)+'</textarea></div>'
+
+        +'<div class="form-group"><label class="label">Sideline reminder for parents <span style="color:var(--text-muted);font-weight:400">(optional — AI will add a default if blank)</span></label>'
+        +'<textarea id="wre-'+wk+'" class="input" style="min-height:50px" placeholder="e.g. Encourage without directing. Let them work it out on the field. Cheer effort, not just goals.">'+(e.reinforce||'')+'</textarea></div>'
+
+        +'<div class="form-group"><label class="label">Match details</label>'
+        +'<input type="text" id="wsc-'+wk+'" class="input" placeholder="e.g. Saturday 11am at Riverside Park, Field 3. Bring shin pads and water." value="'+savedSchedule+'"></div>';
+    } else {
+      fields=''
+        +'<div class="form-group"><label class="label">How did the game go Saturday?</label>'
+        +'<textarea id="wf-'+wk+'" class="input" style="min-height:80px" placeholder="What went well? What is a work in progress? Focus on development, not the result. (e.g. We moved the ball well in the first half and created four chances.)">'+(e.focus||gameRecap)+'</textarea>'
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Pre-filled from your game upload if available. Edit or leave blank if no game this week.</div></div>'
+
+        +'<div class="form-group"><label class="label">What are you working on in training this week?</label>'
+        +'<textarea id="wr-'+wk+'" class="input" style="min-height:70px" placeholder="What is the focus this week and why? (e.g. We are working on combining in the middle third to create chances in behind the defence.)">'+(e.recap||trainingFocus)+'</textarea>'
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Pre-filled from your session uploads if available.</div></div>'
+
+        +'<div class="form-group"><label class="label">One thing for parents to reinforce <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>'
+        +'<textarea id="wre-'+wk+'" class="input" style="min-height:50px" placeholder="What can parents ask or encourage at home? (e.g. Ask your child what they worked on and let them explain it to you.)">'+(e.reinforce||'')+'</textarea></div>'
+
+        +'<div class="form-group"><label class="label">Player spotlight <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>'
+        +'<input type="text" id="wsp-'+wk+'" class="input" placeholder="e.g. Bradley showed great commitment with three overlapping runs." value="'+(e.spotlight||'')+'"></div>'
+
+        +'<div class="form-group"><label class="label">Upcoming schedule / logistics</label>'
+        +'<input type="text" id="wsc-'+wk+'" class="input" placeholder="e.g. Training Mon 6pm + Wed 6pm. Game Saturday 10am at home." value="'+savedSchedule+'"></div>';
+    }
+
+    return banner+fields;
   },
+
+
   setEmailType(wk,type){
     const e=State.weeklyEmails[wk]||{};
     e.email_type=type;
@@ -1879,6 +1925,10 @@ Write a reflection. Share it with someone who will challenge you.`},
     const isGame=(State.weeklyEmails[wk]?.email_type==='pregame');
     const context=(document.getElementById('wctx-'+wk)?.value||'').trim();
     const schedule=(document.getElementById('wsc-'+wk)?.value||'').trim();
+    const spotlight=(document.getElementById('wsp-'+wk)?.value||'').trim();
+    const focus=(document.getElementById('wf-'+wk)?.value||'').trim();
+    const recap=(document.getElementById('wr-'+wk)?.value||'').trim();
+    const reinforce=(document.getElementById('wre-'+wk)?.value||'').trim();
     const ep=document.getElementById('ep-'+wk);
     const eb=document.getElementById('et-body-'+wk);
     if(ep)ep.style.display='block';
@@ -1907,6 +1957,10 @@ Write a reflection. Share it with someone who will challenge you.`},
     if(vals)p+='Team values: '+vals+'. ';
     if(schedule)p+='Logistics: '+schedule+'. ';
     if(context)p+='Extra: '+context+'. ';
+    if(focus)p+='Coach notes on game: '+focus+'. ';
+    if(recap)p+='Coach notes on training: '+recap+'. ';
+    if(reinforce)p+='Sideline reminder: '+reinforce+'. ';
+    if(spotlight)p+='Player spotlight: '+spotlight+'. ';
     if(styleSample)p+='Match this writing style: '+styleSample.slice(0,400)+'. ';
     p+='Rules: flowing paragraphs only, no headers or bullets, warm and conversational, development-focused, normalise mistakes. ';
     p+='Start with Hi everyone, — end with Thank you for all that you do! and '+name+'. Max 3 paragraphs. Write ONLY the email.';
