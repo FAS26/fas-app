@@ -1829,60 +1829,73 @@ Write a reflection. Share it with someone who will challenge you.`},
     const training=sessions.filter(s=>s.session_objective!=='Game Day'&&!s.session_objective?.startsWith('GAMEDAY'));
     const games=sessions.filter(s=>s.session_objective==='Game Day'||s.session_objective?.startsWith('GAMEDAY'));
 
-    // Pre-fill from session data where available
-    const gameRecap=games.map(s=>s.encouragement||'').filter(Boolean).join(' ');
-    const trainingFocus=training.map(s=>[s.focus_area_1,s.focus_area_2].filter(Boolean).join(', ')).filter(Boolean).join('; ');
-    const trainingHighlight=training.map(s=>s.encouragement||'').filter(Boolean).join(' ');
-    const savedSchedule=e.schedule||'';
+    // Pull from session AI analysis
+    const sessionTopic=training.map(s=>s.session_objective||s.title||'').filter(Boolean).join(', ');
+    const focusAreas=training.map(s=>[s.focus_area_1,s.focus_area_2].filter(Boolean).join(' and ')).filter(Boolean).join('; ');
+    const sessionHighlights=training.map(s=>s.encouragement||'').filter(Boolean).join(' ');
+    const gameReflection=games.map(s=>s.encouragement||'').filter(Boolean).join(' ');
+    const gameTitle=games.length?games.map(s=>s.title||'Game').join(', '):'';
+    const vals=State.values.length?State.values.join(', '):'';
 
-    // Session info banner
     let banner='';
     if(sessions.length){
-      const names=sessions.map(s=>'<span style="font-size:11px;background:var(--lime-pale);border:1px solid #bbf7d0;border-radius:4px;padding:1px 6px">'+s.title+'</span>').join(' ');
-      banner='<div style="background:var(--dark);border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:12px">'
-        +'<div style="color:var(--lime);font-weight:600;margin-bottom:6px">&#10003; Linked to '+sessions.length+' upload'+(sessions.length>1?'s':'')+' this week</div>'
-        +'<div style="display:flex;flex-wrap:wrap;gap:4px">'+names+'</div>'
-        +'<div style="color:var(--text-muted);margin-top:6px;font-size:11px">The AI will read these uploads. Fill in anything below that the session recording may not cover.</div>'
+      const names=sessions.map(s=>'<span style="font-size:11px;background:var(--lime-pale);border:1px solid #bbf7d0;border-radius:4px;padding:2px 7px">'+s.title+'</span>').join(' ');
+      banner='<div style="background:var(--dark);border-radius:8px;padding:12px 14px;margin-bottom:16px">'
+        +'<div style="color:var(--lime);font-weight:600;font-size:12px;margin-bottom:6px">&#10003; '+sessions.length+' upload'+(sessions.length>1?'s':'')+' found for this week</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">'+names+'</div>'
+        +'<div style="color:var(--text-muted);font-size:11px;line-height:1.5">The AI will read these uploads and write the email. The prompts below are pre-filled where possible — review and add anything the recordings may not have captured.</div>'
         +'</div>';
     } else {
-      banner='<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#92400e">'
-        +'<strong>No uploads found for this week.</strong> Fill in the prompts below and click Generate — or upload a session first for the best results.'
+      banner='<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#78350f">'
+        +'<strong>No uploads found for this week.</strong> Upload a session or game day report for best results — or fill in the prompts below and click Generate.'
         +'</div>';
     }
 
     let fields='';
     if(isGame){
+      // PRE-GAME EMAIL
       fields=''
-        +'<div class="form-group"><label class="label">What to look for in this match</label>'
-        +'<textarea id="wf-'+wk+'" class="input" style="min-height:70px" placeholder="What are players working on? What should parents watch for? (e.g. pressing high, wide play, our half-time routine)">'+(e.focus||trainingFocus)+'</textarea>'
-        +'<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Pre-filled from your training uploads if available. Edit freely.</div></div>'
+        +'<div class="form-group"><label class="label">What is the team working on in this game? <span style="color:var(--lime-muted);font-size:10px">AI will read from uploads</span></label>'
+        +'<textarea id="wf-'+wk+'" class="input" style="min-height:65px" placeholder="e.g. Pressing high as a unit, wide play and overlapping runs, keeping possession under pressure">'+(e.focus||focusAreas)+'</textarea>'
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Help parents watch intelligently — what tactical or technical themes should they look for?</div></div>'
 
-        +'<div class="form-group"><label class="label">How has training gone leading up to this game?</label>'
-        +'<textarea id="wr-'+wk+'" class="input" style="min-height:60px" placeholder="What has the team been working on? What improvements are you seeing?">'+(e.recap||trainingHighlight)+'</textarea></div>'
-
-        +'<div class="form-group"><label class="label">Sideline reminder for parents <span style="color:var(--text-muted);font-weight:400">(optional — AI will add a default if blank)</span></label>'
-        +'<textarea id="wre-'+wk+'" class="input" style="min-height:50px" placeholder="e.g. Encourage without directing. Let them work it out on the field. Cheer effort, not just goals.">'+(e.reinforce||'')+'</textarea></div>'
+        +'<div class="form-group"><label class="label">How has training gone this week? <span style="color:var(--lime-muted);font-size:10px">AI will read from uploads</span></label>'
+        +'<textarea id="wr-'+wk+'" class="input" style="min-height:60px" placeholder="e.g. The team has been sharp in training. Good energy and real improvement in the press.">'+(e.recap||sessionHighlights)+'</textarea></div>'
 
         +'<div class="form-group"><label class="label">Match details</label>'
-        +'<input type="text" id="wsc-'+wk+'" class="input" placeholder="e.g. Saturday 11am at Riverside Park, Field 3. Bring shin pads and water." value="'+savedSchedule+'"></div>';
+        +'<input type="text" id="wsc-'+wk+'" class="input" placeholder="e.g. Saturday 11am · Riverside Park Field 3 · Home kit" value="'+(e.schedule||'')+'"></div>'
+
+        +'<div class="form-group"><label class="label">Anything else to include? <span style="color:var(--text-muted);font-weight:400;font-size:11px">optional</span></label>'
+        +'<textarea id="wctx-'+wk+'" class="input" style="min-height:45px" placeholder="e.g. Missing two players, weather may be cold, bring extra layers"></textarea></div>';
+
     } else {
+      // MONDAY EMAIL
       fields=''
-        +'<div class="form-group"><label class="label">How did the game go Saturday?</label>'
-        +'<textarea id="wf-'+wk+'" class="input" style="min-height:80px" placeholder="What went well? What is a work in progress? Focus on development, not the result. (e.g. We moved the ball well in the first half and created four chances.)">'+(e.focus||gameRecap)+'</textarea>'
-        +'<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Pre-filled from your game upload if available. Edit or leave blank if no game this week.</div></div>'
+        // Game reflection
+        +'<div class="form-group"><label class="label">How did the game go? <span style="color:var(--lime-muted);font-size:10px">AI will read from game upload</span></label>'
+        +'<textarea id="wf-'+wk+'" class="input" style="min-height:70px" placeholder="e.g. Good first half — we created chances and defended well. Second half we lost our shape a little. Work in progress and that is fine.">'+(e.focus||gameReflection)+'</textarea>'
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Focus on development not the result. Leave blank if no game this week.</div></div>'
 
-        +'<div class="form-group"><label class="label">What are you working on in training this week?</label>'
-        +'<textarea id="wr-'+wk+'" class="input" style="min-height:70px" placeholder="What is the focus this week and why? (e.g. We are working on combining in the middle third to create chances in behind the defence.)">'+(e.recap||trainingFocus)+'</textarea>'
-        +'<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Pre-filled from your session uploads if available.</div></div>'
+        // Training topic - KEY CHANGE: about what the TEAM is working on
+        +'<div class="form-group"><label class="label">What is the team working on this week? <span style="color:var(--lime-muted);font-size:10px">AI will read from session upload</span></label>'
+        +'<textarea id="wr-'+wk+'" class="input" style="min-height:70px" placeholder="e.g. This week the team is working on combining in the middle third — using quick passes and movement to create space in behind the defence.">'+(e.recap||sessionTopic+(focusAreas?' — '+focusAreas:''))+'</textarea>'
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:3px">Pre-filled from your session upload. This should be about what the <em>team</em> is developing — the AI will explain the why for parents.</div></div>'
 
-        +'<div class="form-group"><label class="label">One thing for parents to reinforce <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>'
-        +'<textarea id="wre-'+wk+'" class="input" style="min-height:50px" placeholder="What can parents ask or encourage at home? (e.g. Ask your child what they worked on and let them explain it to you.)">'+(e.reinforce||'')+'</textarea></div>'
+        // Values - auto from State.values
+        +'<div class="form-group"><label class="label">Values demonstrated this week <span style="color:var(--text-muted);font-weight:400;font-size:11px">optional — AI will reference your team values automatically</span></label>'
+        +'<input type="text" id="wval-'+wk+'" class="input" placeholder="'+(vals?'Your values: '+vals:'e.g. Resilience, Communication — add via Team → Values')+'" value="'+(e.values_note||'')+'"></div>'
 
-        +'<div class="form-group"><label class="label">Player spotlight <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>'
-        +'<input type="text" id="wsp-'+wk+'" class="input" placeholder="e.g. Bradley showed great commitment with three overlapping runs." value="'+(e.spotlight||'')+'"></div>'
+        // Player spotlight
+        +'<div class="form-group"><label class="label">Player spotlight <span style="color:var(--text-muted);font-weight:400;font-size:11px">optional</span></label>'
+        +'<input type="text" id="wsp-'+wk+'" class="input" placeholder="e.g. Bradley showed great commitment with three overlapping runs — specific and genuine" value="'+(e.spotlight||'')+'"></div>'
 
+        // Schedule
         +'<div class="form-group"><label class="label">Upcoming schedule / logistics</label>'
-        +'<input type="text" id="wsc-'+wk+'" class="input" placeholder="e.g. Training Mon 6pm + Wed 6pm. Game Saturday 10am at home." value="'+savedSchedule+'"></div>';
+        +'<input type="text" id="wsc-'+wk+'" class="input" placeholder="e.g. Training Mon 6pm + Wed 6pm · Game Saturday 10am at home" value="'+(e.schedule||'')+'"></div>'
+
+        // Extra context
+        +'<div class="form-group"><label class="label">Anything else to include? <span style="color:var(--text-muted);font-weight:400;font-size:11px">optional</span></label>'
+        +'<textarea id="wctx-'+wk+'" class="input" style="min-height:45px" placeholder="e.g. Reminder about fee payment, kit collection, early finish this Wednesday"></textarea></div>';
     }
 
     return banner+fields;
@@ -1923,16 +1936,20 @@ Write a reflection. Share it with someone who will challenge you.`},
 
   async generateEmailAI(wk){
     const isGame=(State.weeklyEmails[wk]?.email_type==='pregame');
-    const context=(document.getElementById('wctx-'+wk)?.value||'').trim();
-    const schedule=(document.getElementById('wsc-'+wk)?.value||'').trim();
-    const spotlight=(document.getElementById('wsp-'+wk)?.value||'').trim();
-    const focus=(document.getElementById('wf-'+wk)?.value||'').trim();
-    const recap=(document.getElementById('wr-'+wk)?.value||'').trim();
-    const reinforce=(document.getElementById('wre-'+wk)?.value||'').trim();
     const ep=document.getElementById('ep-'+wk);
     const eb=document.getElementById('et-body-'+wk);
     if(ep)ep.style.display='block';
-    if(eb){eb.value='Generating…';eb.style.opacity='0.5';}
+    if(eb){eb.value='Generating your email…';eb.style.opacity='0.5';}
+
+    // Read all prompt fields
+    const gameReflection=(document.getElementById('wf-'+wk)?.value||'').trim();
+    const teamFocus=(document.getElementById('wr-'+wk)?.value||'').trim();
+    const valuesNote=(document.getElementById('wval-'+wk)?.value||'').trim();
+    const spotlight=(document.getElementById('wsp-'+wk)?.value||'').trim();
+    const schedule=(document.getElementById('wsc-'+wk)?.value||'').trim();
+    const extraContext=(document.getElementById('wctx-'+wk)?.value||'').trim();
+
+    // Get sessions for this week
     const startDateStr=State.settings.seasonStartDate||'';
     const startDate=startDateStr?new Date(startDateStr):null;
     let weekSessions=[];
@@ -1942,258 +1959,87 @@ Write a reflection. Share it with someone who will challenge you.`},
       weekSessions=State.sessions.filter(s=>{const d=new Date(s.date||s.created_at);return d>=wkStart&&d<=wkEnd;});
     }
     if(!weekSessions.length)weekSessions=State.sessions.slice(0,2);
+
     const training=weekSessions.filter(s=>s.session_objective!=='Game Day'&&!s.session_objective?.startsWith('GAMEDAY'));
     const games=weekSessions.filter(s=>s.session_objective==='Game Day'||s.session_objective?.startsWith('GAMEDAY'));
+
+    // Build rich session context from AI analysis fields
+    const sessionData=training.map(s=>{
+      const parts=[];
+      if(s.title)parts.push('Session topic: '+s.title);
+      if(s.session_objective)parts.push('Objective: '+s.session_objective);
+      if(s.focus_area_1)parts.push('Focus area 1: '+s.focus_area_1);
+      if(s.focus_area_2)parts.push('Focus area 2: '+s.focus_area_2);
+      if(s.encouragement)parts.push('What went well: '+s.encouragement);
+      if(s.grade)parts.push('Session grade: '+s.grade);
+      return parts.join('. ');
+    }).join('\n\n');
+
+    const gameData=games.map(s=>{
+      const parts=[];
+      if(s.title)parts.push('Game: '+s.title);
+      if(s.encouragement)parts.push('What went well: '+s.encouragement);
+      if(s.focus_area_1)parts.push('Focus area 1: '+s.focus_area_1);
+      if(s.focus_area_2)parts.push('Focus area 2: '+s.focus_area_2);
+      return parts.join('. ');
+    }).join('\n\n');
+
+    const teamValues=State.values.length?State.values.join(', '):'';
     const prevBodies=Object.values(State.weeklyEmails).filter(e=>e.body&&e.week<wk).slice(-3).map(e=>e.body);
-    const styleSample=prevBodies.join(' | ');
+    const styleSample=prevBodies.join(' | ').slice(0,600);
     const name=coachName();
-    const vals=State.values.length?State.values.join(', '):'';
-    const tSummary=training.map(s=>'Session: '+s.title+'. Focus: '+(s.focus_area_1||'')+'. '+( s.encouragement||'')).join(' ');
-    const gSummary=games.map(s=>'Game: '+s.title+'. '+(s.encouragement||'')).join(' ');
-    let p='Write a parent email for coach '+name+'. ';
-    p+=isGame?'Type: Pre-Game (what to look for match day). ':'Type: Monday (reflect on game, preview training). ';
-    if(tSummary)p+='Training this week: '+tSummary+'. ';
-    if(gSummary)p+='Game report: '+gSummary+'. ';
-    if(vals)p+='Team values: '+vals+'. ';
-    if(schedule)p+='Logistics: '+schedule+'. ';
-    if(context)p+='Extra: '+context+'. ';
-    if(focus)p+='Coach notes on game: '+focus+'. ';
-    if(recap)p+='Coach notes on training: '+recap+'. ';
-    if(reinforce)p+='Sideline reminder: '+reinforce+'. ';
-    if(spotlight)p+='Player spotlight: '+spotlight+'. ';
-    if(styleSample)p+='Match this writing style: '+styleSample.slice(0,400)+'. ';
-    p+='Rules: flowing paragraphs only, no headers or bullets, warm and conversational, development-focused, normalise mistakes. ';
-    p+='Start with Hi everyone, — end with Thank you for all that you do! and '+name+'. Max 3 paragraphs. Write ONLY the email.';
+
+    // Build AI prompt
+    let p='';
+    p+='You are writing a parent email for '+name+', a youth football/soccer coach.\n\n';
+    p+='EMAIL TYPE: '+(isGame?'Pre-Game email (sent the day before a match)':'Monday email (sent at the start of the training week)')+'\n\n';
+
+    if(sessionData)p+='SESSION ANALYSIS FROM UPLOADS:\n'+sessionData+'\n\n';
+    if(gameData)p+='GAME DAY ANALYSIS FROM UPLOADS:\n'+gameData+'\n\n';
+    if(gameReflection)p+='COACH NOTES ON THE GAME: '+gameReflection+'\n\n';
+    if(teamFocus)p+='WHAT THE TEAM IS WORKING ON: '+teamFocus+'\n\n';
+    if(teamValues)p+='TEAM VALUES: '+teamValues+'\n\n';
+    if(valuesNote)p+='VALUES DEMONSTRATED THIS WEEK: '+valuesNote+'\n\n';
+    if(spotlight)p+='PLAYER SPOTLIGHT: '+spotlight+'\n\n';
+    if(schedule)p+='LOGISTICS: '+schedule+'\n\n';
+    if(extraContext)p+='EXTRA CONTEXT: '+extraContext+'\n\n';
+    if(styleSample)p+='MATCH THIS COACH\u2019S WRITING STYLE (previous emails):\n'+styleSample+'\n\n';
+
+    p+='INSTRUCTIONS:\n';
+    p+='1. Write in flowing paragraphs — NO headers, NO bullet points, NO all-caps section titles\n';
+    p+='2. Warm and conversational — like a genuine letter from a coach who cares\n';
+    p+='3. Development-focused — never about the result, always about growth\n';
+    p+='4. The training section must be about what the TEAM is working on and developing — not personal coaching goals\n';
+    p+='5. Normalise mistakes — frame them as opportunities to learn\n';
+    p+='6. Reference team values naturally if relevant\n';
+    if(!isGame){
+      p+='7. Include a PARENT REINFORCEMENT section woven naturally into the text — based on what the team is working on, give parents 2-3 specific questions to ask their child (e.g. "Ask them: What did you try today that was hard? What would you do differently?"). These should feel like conversation starters, not homework\n';
+      p+='8. The questions should connect directly to the training topic and values demonstrated\n';
+    } else {
+      p+='7. Help parents watch intelligently — explain what the team is trying to do so parents can appreciate development moments\n';
+      p+='8. Remind parents the best thing they can do is encourage without directing — let the players communicate their own ideas\n';
+    }
+    p+='9. Start with: Hi everyone,\n';
+    p+='10. End with: Thank you for all that you do! then a new line with just: '+name+'\n';
+    p+='11. Keep it to 3-4 paragraphs maximum — coaches and parents are busy\n';
+    p+='12. Write ONLY the email text — no subject line, no commentary\n';
+
     try{
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
         headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY},
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:p}]})
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,messages:[{role:'user',content:p}]})
       });
-      const body=resp.ok?(await resp.json()).content[0].text.trim():Team.fallbackEmail(isGame,training,games,schedule,context,name);
+      const body=resp.ok?(await resp.json()).content[0].text.trim():Team.fallbackEmail(isGame,training,games,schedule,extraContext,name);
       if(eb){eb.value=body;eb.style.opacity='1';}
-      State.weeklyEmails[wk]={...State.weeklyEmails[wk],body,email_type:isGame?'pregame':'monday'};
-      await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,body,email_type:isGame?'pregame':'monday'},{onConflict:'user_id,week'});
-    }catch(e){
-      const body=Team.fallbackEmail(isGame,training,games,schedule,context,name);
+      State.weeklyEmails[wk]={...State.weeklyEmails[wk],body,email_type:isGame?'pregame':'monday',schedule,spotlight};
+      await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,body,email_type:isGame?'pregame':'monday',schedule,spotlight},{onConflict:'user_id,week'});
+    }catch(err){
+      const body=Team.fallbackEmail(isGame,training,games,schedule,extraContext,name);
       if(eb){eb.value=body;eb.style.opacity='1';}
     }
   },
 
-  async saveCheckin(pn){
-    const notes=$(`ci-${pn}`)?.value?.trim();if(!notes)return;
-    const row={user_id:State.user.id,coach_name:coachName(),player_name:pn,notes,date:new Date().toISOString().slice(0,10)};
-    const{data}=await sb.from('player_checkins').insert(row).select().single();
-    if(data)State.checkins.unshift(data);
-    Team.renderPlayers();
-  },
-
-  async saveInteraction(){
-    const player=$('li-player').value,type=$('li-type').value,note=$('li-note').value.trim();
-    if(!player)return;
-    const row={user_id:State.user.id,coach_name:coachName(),player_name:player,type,note,date:new Date().toISOString().slice(0,10),source:'manual'};
-    const{data}=await sb.from('interactions').insert(row).select().single();
-    if(data)State.interactions.push(data);
-    closeModal('logInteractionModal');
-    Team.renderPlayers();
-  },
-
-  // ── ROSTER / TEAM ─────────────────────────────────────────────────────────────
-  // ── PLAYERS ─────────────────────────────────────────────────────────────────
-  renderPlayers(){
-    State.currentSubSection='players';
-    const roster=State.roster||[];
-    const interactions=State.interactions||[];
-    const checkins=State.checkins||[];
-    const today=new Date();
-    const conn={};
-    roster.forEach(p=>{
-      const pi=interactions.filter(i=>i.player_name===p.name);
-      const pc=checkins.filter(c=>c.player_name===p.name);
-      const lastInt=pi.length?new Date(pi.slice(-1)[0].date||pi.slice(-1)[0].created_at):null;
-      const lastCI=pc.length?new Date(pc[0].date||pc[0].created_at):null;
-      const lastContact=lastInt&&lastCI?new Date(Math.max(lastInt,lastCI)):lastInt||lastCI;
-      const daysSince=lastContact?Math.floor((today-lastContact)/864e5):null;
-      conn[p.name]={pi,pc,praise:pi.filter(i=>i.type==='praise').length,reinforcement:pi.filter(i=>i.type==='reinforcement').length,feedback:pi.filter(i=>i.type==='feedback').length,correction:pi.filter(i=>i.type==='correction').length,total:pi.length,daysSince,needsCheckin:daysSince===null||daysSince>21};
-    });
-    const maxInt=Math.max(1,...Object.values(conn).map(c=>c.total));
-    const needsCI=roster.filter(p=>conn[p.name]?.needsCheckin);
-
-    if(!roster.length){
-      setMain('<div class="page-header"><div><h1>Players</h1></div><button class="btn btn-primary btn-sm" onclick="Team.showAddPlayer()">+ Add Player</button></div><div class="page-body"><div class="card" style="text-align:center;padding:40px"><div style="font-size:32px;margin-bottom:12px">&#128101;</div><div style="font-weight:600;margin-bottom:6px">No players yet</div><div style="color:var(--text-muted);font-size:13px;margin-bottom:16px">Add your roster to track connections and stats</div><button class="btn btn-primary" onclick="Team.showAddPlayer()">Add First Player</button></div></div>');
-      return;
-    }
-
-    // Build heatmap rows
-    const heatRows=roster.map(p=>{
-      const c=conn[p.name];
-      const sc=c.total?Math.min(180,(c.total/maxInt)*180):0;
-      const days=c.daysSince;
-      const ciColor=days===null||days>21?'#ef4444':days>14?'#fbbf24':'#22c55e';
-      const ciLabel=days===null?'Never':days===0?'Today':days+'d ago';
-      const pn=p.name.replace(/"/g,'&quot;');
-      return '<div class="heatmap-row" style="cursor:pointer" onclick="Team.openPlayer(this)"  data-player="'+pn+'">'
-        +'<div class="heatmap-name">'+p.name+(p.number?' #'+p.number:'')+'</div>'
-        +'<div class="heatmap-bar"><div style="display:flex;height:14px;border-radius:4px;overflow:hidden;width:'+sc+'px">'
-        +'<div style="flex:'+c.praise+';background:#22c55e"></div>'
-        +'<div style="flex:'+c.reinforcement+';background:#84cc16"></div>'
-        +'<div style="flex:'+c.feedback+';background:#3b82f6"></div>'
-        +'<div style="flex:'+c.correction+';background:#ef4444"></div>'
-        +'</div></div>'
-        +'<div style="font-size:11px;font-weight:600;color:'+ciColor+';flex-shrink:0;width:70px;text-align:right">'+ciLabel+'</div>'
-        +'<div style="font-size:11px;color:var(--lime);margin-left:6px">&#8250;</div>'
-        +'</div>';
-    }).join('');
-
-    // Build player cards
-    const playerCards=roster.map(p=>{
-      const c=conn[p.name];
-      const stats=p.stats||{goals:0,assists:0,saves:0,gamesPlayed:0,gamesStarted:0,minutesPlayed:0};
-      const ppos=p.positions_played||[];
-      const safeId='pc-'+p.name.replace(/[^a-zA-Z0-9]/g,'_');
-      const pn=p.name.replace(/"/g,'&quot;');
-      const statItems=[
-        {k:'goals',l:'Goals',s:'tap to edit'},
-        {k:'assists',l:'Assists',s:'tap to edit'},
-        {k:'saves',l:'Saves',s:'tap to edit'},
-        {k:'gamesPlayed',l:'Games',s:'played'},
-        {k:'gamesStarted',l:'Started',s:'games'},
-        {k:'minutesPlayed',l:'Minutes',s:'played'},
-      ];
-      const statsHtml=statItems.map(si=>'<div class="metric-card" style="cursor:pointer" onclick="Team.editStat(this)" data-player="'+pn+'" data-stat="'+si.k+'" data-val="'+(stats[si.k]||0)+'">'
-        +'<div class="metric-label">'+si.l+'</div>'
-        +'<div class="metric-value">'+(stats[si.k]||0)+'</div>'
-        +'<div class="metric-sub">'+si.s+'</div>'
-        +'</div>').join('');
-      const posHtml=['GK','RB','CB','LB','CDM','CM','CAM','RW','LW','ST'].map(pos=>'<span onclick="Team.togglePosition(this)" data-player="'+pn+'" data-pos="'+pos+'" style="cursor:pointer;font-size:11px;font-weight:600;padding:3px 10px;border-radius:100px;background:'+(ppos.includes(pos)?'var(--lime)':'var(--border)')+';color:'+(ppos.includes(pos)?'var(--dark-deep)':'var(--text-muted)')+'">'+pos+'</span>').join('');
-      const ciHtml=c.pc.slice(0,3).map(ci=>'<div style="font-size:12px;color:var(--text-muted);margin-bottom:3px"><span style="color:var(--lime-muted)">'+ci.date+'</span> &#8212; '+ci.notes+'</div>').join('');
-      return '<div class="card" id="'+safeId+'" style="margin-bottom:10px;display:none">'
-        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
-          +'<div style="font-weight:700;font-size:15px">'+p.name+(p.number?' <span style=\"color:var(--text-muted);font-weight:normal\">#'+p.number+'</span>':'')+'</div>'
-          +'<button onclick="Team.deletePlayer(this)" data-id="'+p.id+'" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">&#215;</button>'
-        +'</div>'
-        +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">'+statsHtml+'</div>'
-        +'<div style="margin-bottom:12px"><label class="label">Positions Played</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+posHtml+'</div></div>'
-        +'<div style="border-top:1px solid var(--border);padding-top:12px">'
-          +'<div style="font-size:12px;font-weight:600;margin-bottom:6px">Check-in Notes</div>'
-          +ciHtml
-          +'<div style="display:flex;gap:8px;margin-top:8px">'
-            +'<textarea class="input player-ci" data-player="'+pn+'" placeholder="How is this player doing?" style="min-height:50px;flex:1"></textarea>'
-            +'<button class="btn btn-primary btn-sm" onclick="Team.saveCheckinEl(this)" data-player="'+pn+'" style="align-self:flex-end">Save</button>'
-          +'</div>'
-        +'</div>'
-        +'</div>';
-    }).join('');
-
-    const ciAlert=needsCI.length?'<div class="alert alert-warn" style="margin-bottom:14px"><strong>&#9888; Check-in needed:</strong> '+needsCI.map(p=>p.name).join(', ')+'</div>':'';
-
-    setMain('<div class="page-header">'
-      +'<div><h1>Players</h1><p>Roster &#183; Connection heatmap &#183; Stats &#183; Playing time</p></div>'
-      +'<div style="display:flex;gap:8px">'
-        +'<button class="btn btn-primary btn-sm" onclick="Team.showAddPlayer()">+ Add Player</button>'
-        +'<button class="btn btn-sm" onclick="openModal(\'logInteractionModal\')">Log Interaction</button>'
-      +'</div></div>'
-      +'<div class="page-body">'
-        +ciAlert
-        +'<div class="card" style="margin-bottom:14px">'
-          +'<div class="card-header"><div class="card-title">Connection Heatmap</div>'
-          +'<div style="display:flex;gap:10px;font-size:11px;color:var(--text-muted)">'
-            +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#22c55e;margin-right:3px"></span>Praise</span>'
-            +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#84cc16;margin-right:3px"></span>Reinforce</span>'
-            +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#3b82f6;margin-right:3px"></span>Feedback</span>'
-            +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#ef4444;margin-right:3px"></span>Correction</span>'
-          +'</div></div>'
-          +heatRows
-        +'</div>'
-        +'<div id="playerCards">'+playerCards+'</div>'
-      +'</div>');
-
-    const liPlayer=document.getElementById('li-player');
-    if(liPlayer)liPlayer.innerHTML=roster.map(p=>'<option value="'+p.name.replace(/"/g,'&quot;')+'">'+p.name+'</option>').join('');
-  },
-
-  openPlayer(el){
-    const name=el.dataset.player;
-    const safeId='pc-'+name.replace(/[^a-zA-Z0-9]/g,'_');
-    const card=document.getElementById(safeId);
-    if(!card)return;
-    const isOpen=card.style.display!=='none';
-    document.querySelectorAll('[id^="pc-"]').forEach(e=>e.style.display='none');
-    if(!isOpen)card.style.display='block';
-  },
-
-  showAddPlayer(){
-    const m=document.getElementById('addPlayerModal');
-    if(!m)return;
-    m.querySelector('.modal-content').innerHTML='<div class="modal-body">'
-      +'<h3 style="margin-bottom:16px">Add Player</h3>'
-      +'<div class="form-group"><label class="label">Name</label><input id="ap-name" class="input" placeholder="Full name"></div>'
-      +'<div class="form-group"><label class="label">Number</label><input id="ap-num" class="input" type="number" placeholder="#"></div>'
-      +'<div class="form-group"><label class="label">Position</label>'
-        +'<select id="ap-pos" class="input"><option value="">Select</option>'
-        +'<option>GK</option><option>RB</option><option>CB</option><option>LB</option>'
-        +'<option>CDM</option><option>CM</option><option>CAM</option><option>RW</option><option>LW</option><option>ST</option>'
-        +'</select></div>'
-      +'<div style="display:flex;gap:8px;margin-top:16px">'
-        +'<button class="btn btn-primary" onclick="Team.addPlayer()">Add Player</button>'
-        +'<button class="btn" onclick="closeModal(\'addPlayerModal\')">Cancel</button>'
-      +'</div></div>';
-    openModal('addPlayerModal');
-  },
-
-  async addPlayer(){
-    const name=document.getElementById('ap-name')?.value?.trim();
-    const num=document.getElementById('ap-num')?.value?.trim();
-    const pos=document.getElementById('ap-pos')?.value?.trim();
-    if(!name){alert('Please enter a name');return;}
-    const{data,error}=await sb.from('roster').insert({user_id:State.user.id,coach_name:coachName(),name,number:num||'',position:pos||'',stats:{goals:0,assists:0,saves:0,gamesPlayed:0,gamesStarted:0,minutesPlayed:0},positions_played:pos?[pos]:[]}).select().single();
-    if(error){alert('Error: '+error.message);return;}
-    if(data)State.roster.push(data);
-    closeModal('addPlayerModal');
-    Team.renderPlayers();
-  },
-
-  async deletePlayer(el){
-    const id=el.dataset.id;
-    if(!confirm('Remove this player?'))return;
-    await sb.from('roster').delete().eq('id',id);
-    State.roster=State.roster.filter(p=>p.id!==id);
-    Team.renderPlayers();
-  },
-
-  async editStat(el){
-    const playerName=el.dataset.player;
-    const stat=el.dataset.stat;
-    const current=el.dataset.val||0;
-    const labels={goals:'Goals',assists:'Assists',saves:'Saves',gamesPlayed:'Games Played',gamesStarted:'Games Started',minutesPlayed:'Minutes Played'};
-    const val=prompt('Update '+labels[stat]+' for '+playerName+':',current);
-    if(val===null)return;
-    const player=State.roster.find(p=>p.name===playerName);
-    if(!player)return;
-    player.stats=player.stats||{};
-    player.stats[stat]=parseInt(val)||0;
-    await sb.from('roster').update({stats:player.stats}).eq('id',player.id);
-    Team.renderPlayers();
-    const safeId='pc-'+playerName.replace(/[^a-zA-Z0-9]/g,'_');
-    const card=document.getElementById(safeId);
-    if(card)card.style.display='block';
-  },
-
-  async togglePosition(el){
-    const playerName=el.dataset.player;
-    const pos=el.dataset.pos;
-    const player=State.roster.find(p=>p.name===playerName);
-    if(!player)return;
-    player.positions_played=player.positions_played||[];
-    const idx=player.positions_played.indexOf(pos);
-    if(idx>-1)player.positions_played.splice(idx,1);
-    else player.positions_played.push(pos);
-    await sb.from('roster').update({positions_played:player.positions_played}).eq('id',player.id);
-    Team.renderPlayers();
-    const safeId='pc-'+playerName.replace(/[^a-zA-Z0-9]/g,'_');
-    const card=document.getElementById(safeId);
-    if(card)card.style.display='block';
-  },
 
   async saveCheckinEl(el){
     const playerName=el.dataset.player;
