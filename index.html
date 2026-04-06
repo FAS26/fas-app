@@ -277,6 +277,9 @@ textarea.input{resize:vertical;min-height:80px;line-height:1.6;}
   .grid-2,.grid-3,.grid-4{grid-template-columns:1fr;}
 }
 @media(min-width:769px){.mobile-nav{display:none;}}
+
+.res-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;cursor:pointer;transition:border-color .15s,transform .15s;}
+.res-card:hover{border-color:var(--lime);transform:translateY(-2px);}
 </style>
 </head>
 <body>
@@ -3182,37 +3185,254 @@ const Director={
   }
 };
 
-const Community={render(){
-  $('subNav').innerHTML='';
-  setMain(`<div class="page-header"><h1>Community</h1></div><div class="page-body"><div class="empty"><div class="empty-icon">💬</div><h3>Community Coming Soon</h3><p>Connect with other FAS coaches, share insights, ask questions, and celebrate growth together. Launching in the next phase.</p></div></div>`);
-}};
+const Community={
+  render(){
+    $('subNav').innerHTML='';
+    const club=State.profile?.club_name||State.profile?.club_code||'';
+    const coaches=State.clubCoaches||[];
+    const msgs=State.clubMessages||[];
 
-// ─── RESOURCES ────────────────────────────────────────────────────────────────
+    setMain('<div class="page-header"><div><h1>Community</h1><p>'+(club?'Club: '+club:'Connect with coaches in your club')+'</p></div></div>'
+      +'<div class="page-body">'
+        +(club
+          ? Community._clubView(coaches,msgs)
+          : '<div class="card" style="text-align:center;padding:40px">'
+              +'<div style="font-size:32px;margin-bottom:12px">&#128101;</div>'
+              +'<div style="font-weight:600;margin-bottom:8px">No club connected yet</div>'
+              +'<div style="color:var(--text-muted);font-size:13px;margin-bottom:16px">Enter a club code during signup, or ask your director to share one with you. Once connected, you can message other coaches in your club.</div>'
+              +'<button class="btn btn-primary" onclick="Community.joinClub()">Enter Club Code</button>'
+            +'</div>')
+      +'</div>');
+  },
+
+  _clubView(coaches,msgs){
+    const myName=coachName();
+    const coachList=coaches.length
+      ? coaches.map(c=>'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'
+          +'<div style="width:34px;height:34px;border-radius:50%;background:var(--lime);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--dark-deep)">'+c.name.charAt(0).toUpperCase()+'</div>'
+          +'<div><div style="font-size:13px;font-weight:600">'+c.name+'</div>'
+          +'<div style="font-size:11px;color:var(--text-muted)">'+c.age_group+' &middot; '+c.level+'</div></div>'
+        +'</div>').join('')
+      : '<div style="font-size:13px;color:var(--text-muted);padding:12px 0">No other coaches connected in your club yet.</div>';
+
+    const msgList=msgs.length
+      ? msgs.slice(-30).reverse().map(m=>{
+          const isMe=m.coach_name===myName;
+          return '<div style="display:flex;flex-direction:'+(isMe?'row-reverse':'row')+';gap:8px;margin-bottom:12px">'
+            +'<div style="width:30px;height:30px;border-radius:50%;background:'+(isMe?'var(--lime)':'var(--dark)')+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:'+(isMe?'var(--dark-deep)':'var(--lime)')+';flex-shrink:0">'+m.coach_name.charAt(0).toUpperCase()+'</div>'
+            +'<div style="max-width:75%">'
+              +'<div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-align:'+(isMe?'right':'left')+'">'+m.coach_name+' &middot; '+m.created_at?.slice(5,16)+'</div>'
+              +'<div style="background:'+(isMe?'var(--lime)':'var(--dark)')+';color:'+(isMe?'var(--dark-deep)':'var(--white)')+';padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5">'+m.message+'</div>'
+            +'</div>'
+            +'</div>';
+        }).join('')
+      : '<div style="font-size:13px;color:var(--text-muted);text-align:center;padding:20px 0">No messages yet. Start the conversation!</div>';
+
+    return '<div class="grid-2" style="gap:14px">'
+      // Left: coaches in club
+      +'<div class="card">'
+        +'<div class="card-title" style="margin-bottom:12px">Coaches in your club</div>'
+        +coachList
+      +'</div>'
+      // Right: chat
+      +'<div class="card" style="display:flex;flex-direction:column">'
+        +'<div class="card-title" style="margin-bottom:12px">Club Chat</div>'
+        +'<div id="clubMsgFeed" style="flex:1;overflow-y:auto;max-height:350px;min-height:200px;margin-bottom:12px">'+msgList+'</div>'
+        +'<div style="display:flex;gap:8px">'
+          +'<input id="clubMsgInput" class="input" placeholder="Message your club coaches\u2026" style="flex:1" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();Community.send();}">'
+          +'<button class="btn btn-primary btn-sm" onclick="Community.send()">Send</button>'
+        +'</div>'
+      +'</div>'
+    +'</div>';
+  },
+
+  async send(){
+    const input=document.getElementById('clubMsgInput');
+    const msg=input?.value?.trim();
+    if(!msg||!State.user)return;
+    const club=State.profile?.club_name||State.profile?.club_code||'';
+    if(!club)return;
+    input.value='';
+    const row={user_id:State.user.id,coach_name:coachName(),club_code:club,message:msg,created_at:new Date().toISOString()};
+    const{data}=await sb.from('club_messages').insert(row).select().single();
+    if(data){
+      State.clubMessages=State.clubMessages||[];
+      State.clubMessages.push(data);
+    }
+    Community.render();
+  },
+
+  async joinClub(){
+    const code=prompt('Enter your club code:');
+    if(!code)return;
+    await sb.from('profiles').update({club_code:code.trim().toUpperCase()}).eq('id',State.user.id);
+    State.profile.club_code=code.trim().toUpperCase();
+    await Community.loadClub();
+    Community.render();
+  },
+
+  async loadClub(){
+    const club=State.profile?.club_name||State.profile?.club_code||'';
+    if(!club){State.clubCoaches=[];State.clubMessages=[];return;}
+    const{data:coaches}=await sb.from('profiles').select('first_name,last_name,age_group,level').eq('club_code',club).neq('id',State.user.id);
+    State.clubCoaches=(coaches||[]).map(c=>({...c,name:(c.first_name+' '+c.last_name).trim()}));
+    const{data:msgs}=await sb.from('club_messages').select('*').eq('club_code',club).order('created_at',{ascending:true}).limit(50);
+    State.clubMessages=msgs||[];
+  },
+};
+
+
+// ─── RESOURCES ──────────────────────────────────────────────────────────────
+
 const Resources={render(){
   $('subNav').innerHTML='';
-  setMain(`
-  <div class="page-header"><h1>Resources</h1><p>Coaching tools, guides, and frameworks</p></div>
-  <div class="page-body">
-    <div class="grid-2">
-      ${[
-        {icon:'❓',title:'High-Order Questioning',desc:'The difference between recall questions and questions that develop game intelligence. How to use "What do you see?", "Why?", and "What if?" to build thinking players.',badge:'C/D License'},
-        {icon:'🎯',title:'The Freeze Moment',desc:'Freeze → Demo → Rehearse → Restart. How to use planned stopping points to paint the picture with the ball — not words. The US Soccer standard for coaching interactions.',badge:'C/D License'},
-        {icon:'🏆',title:'Praise & Positive Reinforcement',desc:'Why specific praise by name is more powerful than general praise. How the P:C ratio affects risk-taking and player confidence.',badge:'Framework'},
-        {icon:'📊',title:'Understanding Your Metrics',desc:'What your Q:I ratio, P:C ratio, high-order question count and freeze moment data actually mean — and how to use them to improve.',badge:'Data'},
-        {icon:'🌱',title:'Player-Centred Coaching',desc:'The philosophy behind FAS. Why we ask instead of tell. How coaching approach changes across age groups from U7 through U16.',badge:'Philosophy'},
-        {icon:'👥',title:'The Four Game Moments',desc:'Attacking, Attacking-to-Defending Transition, Defending, Defending-to-Attacking Transition. How to connect every session and game day to one of the four moments.',badge:'Framework'},
-      ].map(r=>`<div class="card" style="cursor:pointer" onclick="alert('Full resource guides coming soon.')">
-        <div style="font-size:26px;margin-bottom:8px">${r.icon}</div>
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
-          <div style="font-size:14px;font-weight:700;color:var(--dark)">${r.title}</div>
-          <span class="badge badge-lime" style="flex-shrink:0">${r.badge}</span>
-        </div>
-        <p style="font-size:13px;color:var(--text-muted);line-height:1.6">${r.desc}</p>
-        <div style="margin-top:10px;font-size:12px;color:var(--lime);font-weight:600">Read guide →</div>
-      </div>`).join('')}
-    </div>
-  </div>`);
-}};
+  const guides=[
+    {
+      id:'talk-less',
+      icon:'&#128263;',
+      title:'Talk Less, Watch More',
+      badge:'Coaching Practice',
+      source:'MOJO Sports',
+      url:'https://mojo.sport/coachs-corner/4-reasons-coaches-should-talk-less-and-watch-more/',
+      summary:'Players get better by doing, not by listening. Over-coaching is one of the most common barriers to player development at every level.',
+      content:'One of the most consistent findings in youth coaching research is that coaches talk too much. During games, players often cannot hear instructions anyway \u2014 the environment is too chaotic. More importantly, constant instruction removes the decision-making from the player, which is exactly the skill we are trying to develop.\n\nThe goal is not a team that waits to be told what to do. The goal is a team that reads the game and solves problems independently. Every time a coach fills the silence with an instruction, they are taking that opportunity away from the player.\n\nFour reasons to talk less:\n\n1. They probably cannot hear you during a game. Crowd noise, other coaches, the environment \u2014 short cues of four words or fewer are far more effective than sentences.\n\n2. Silence creates thinking. When you do not provide the answer, players have to find it themselves. That struggle is where learning happens.\n\n3. Watching reveals more than talking. When you are not coaching, you are observing. You notice patterns, individual needs, and moments worth addressing later.\n\n4. Constant instruction signals distrust. Players who are always told what to do begin to believe they cannot figure it out themselves.\n\nPractical approach: Set a personal challenge in your next session \u2014 use questions instead of instructions. Instead of \u201cPass it wide,\u201d ask \u201cWhat do you see?\u201d Count how many times you speak versus how many times you ask. The ratio will reveal more about your coaching than any other single metric.',
+    },
+    {
+      id:'magic-ratio',
+      icon:'&#9889;',
+      title:'The Magic Ratio',
+      badge:'Connection',
+      source:'MOJO Sports',
+      url:'https://mojo.sport/coachs-corner/the-magic-of-the-magic-ratio/',
+      summary:'Five positive interactions for every one corrective interaction. Research shows this ratio transforms the effect of critical feedback on players.',
+      content:'The magic ratio comes from relationship research by psychologist John Gottman \u2014 and it translates directly to coaching. The finding: a ratio of roughly five positive interactions to one corrective interaction creates the conditions where critical feedback is actually heard and acted on.\n\nWhen a player receives mostly corrections, their brain goes into a protective state. They start playing not to make mistakes rather than playing to express themselves. Risk-taking drops. Creativity drops. And ironically, performance drops.\n\nWhen positive interactions significantly outweigh corrections, the relationship between coach and player builds trust. Within that trust, a correction lands as guidance rather than criticism. The player feels safe enough to try, fail, and try again.\n\nIn FAS, your P:C ratio \u2014 the measure of praise and reinforcement to correction in your session transcripts \u2014 is tracking exactly this. The target is 3:1 at minimum. Five to one is where the real change happens.\n\nWhat counts as a positive interaction:\n\u2022 Specific praise by name for effort or process (not just outcome)\n\u2022 Positive reinforcement of a behaviour you want repeated\n\u2022 Acknowledgement of a good decision, even if the execution was imperfect\n\u2022 A question that shows you are genuinely interested in their thinking\n\nThe ratio is not about being soft. It is about being effective. A coach who earns deep trust through consistent positive engagement has far more influence in a difficult moment than a coach who corrects constantly.',
+    },
+    {
+      id:'sel',
+      icon:'&#129309;',
+      title:'Social and Emotional Learning',
+      badge:'Player Development',
+      source:'MOJO Sports',
+      url:'https://mojo.sport/coachs-corner/what-coaches-need-to-know-about-social-and-emotional-learning/',
+      summary:'Sport is one of the most powerful settings for developing life skills \u2014 but only when coaches build SEL intentionally into how they run their sessions.',
+      content:'Social and Emotional Learning (SEL) refers to the development of skills like self-awareness, self-management, responsible decision-making, relationship skills, and social awareness. Research consistently shows that youth who develop these skills through structured programs perform better academically, have stronger mental health, and build healthier relationships.\n\nSport, when coached well, is one of the most effective SEL environments available. The challenge is that SEL does not happen automatically \u2014 it requires coaches to design it in.\n\nFive SEL competencies and how sport develops them:\n\n1. Self-awareness \u2014 Understanding your own emotions, strengths, and limitations. Developed through post-game reflection, check-ins, and goal-setting conversations.\n\n2. Self-management \u2014 Managing impulses and persisting through difficulty. Developed through challenge activities, losing with grace, and bouncing back from mistakes.\n\n3. Social awareness \u2014 Understanding the perspectives of others. Developed through team challenges, role rotation, and captain responsibilities.\n\n4. Relationship skills \u2014 Communicating effectively, resolving conflict. Developed through group problem-solving, values work, and the pre-game routine.\n\n5. Responsible decision-making \u2014 Making choices based on values. Developed by coaches who ask rather than tell \u2014 giving players ownership of decisions on the field.\n\nIn practice: The most powerful SEL moment in any session is often the circle at the end \u2014 when a coach asks a genuine question and genuinely listens to the answer.',
+    },
+    {
+      id:'coach-the-kid',
+      icon:'&#128106;',
+      title:'Coach the Kid, Not the Sport',
+      badge:'Philosophy',
+      source:'MOJO Sports',
+      url:'https://mojo.sport/coachs-corner/the-golden-rule-coach-the-kid-not-the-sport/',
+      summary:'Every team has a player who does not seem to want to be there. How you respond to that player defines your culture more than anything else you do.',
+      content:'The golden rule of youth coaching is simple: coach the human being first, the athlete second. Every team has a player who struggles \u2014 technically, emotionally, socially. The instinct is to focus energy on the players who are most motivated or most talented. The players who respond, improve, and make you look good as a coach.\n\nBut your culture is defined by how you treat the player who is hardest to reach.\n\nCoaching the kid means:\n\u2022 Learning what they care about outside of sport before you ask anything of them inside it\n\u2022 Finding something genuine to praise before addressing what needs to improve\n\u2022 Understanding that disengagement is almost always communication \u2014 something is going on that has nothing to do with football\n\u2022 Adjusting your approach to the individual, not expecting the individual to adjust to your approach\n\nThis does not mean lowering standards. It means understanding that the same standard requires a different path for different players.\n\nPractical tool: In your next check-in with the player who seems least engaged, ask only one question: \u201cWhat would make training better for you?\u201d Then listen. Do not respond with your own ideas. Just listen. What you hear will change how you coach that player.',
+    },
+    {
+      id:'scanning',
+      icon:'&#128065;',
+      title:'Scanning \u2014 The Hidden Skill',
+      badge:'Technical',
+      source:'MOJO Sports',
+      url:'https://mojo.sport/coachs-corner/what-is-scanning/',
+      summary:'The best players in the world share one habit that is almost invisible to the casual observer. They check their shoulder before they receive the ball.',
+      content:'Scanning is the habit of checking your surroundings before you receive the ball \u2014 building a mental picture of where teammates, opponents, and space are located before the ball arrives. When a player scans, they have already made their decision before they touch the ball. This is what makes elite players look like they have more time than everyone else.\n\nFrank Lampard\u2019s father, a professional himself, famously called out \u201cPictures! Pictures!\u201d from the sideline \u2014 encouraging his son to take mental snapshots constantly. It was drilled in from a young age and became automatic.\n\nWhy scanning matters:\n\u2022 Players who scan make faster, better decisions under pressure\n\u2022 It reduces the number of touches needed to control and distribute\n\u2022 It develops spatial awareness that transfers across all positions\n\u2022 It is coachable at any age \u2014 even U8 players can learn the habit\n\nHow to coach it:\n1. Create exercises where players must call out what they see before receiving (\u201cHow many players are in front of you?\u201d)\n2. Use short-sided games with a rule: one touch only, which forces pre-scanning\n3. Praise scanning behaviour specifically by name: \u201cGreat check of the shoulder before you received that, Maya \u2014 you already knew where to go.\u201d\n\nSamsung and other clubs have tracked that top-level players check their surroundings on average 0.5 seconds before receiving. At youth level, the goal is simply to make the habit automatic \u2014 not to hit a number.',
+    },
+    {
+      id:'childrens-rights',
+      icon:'&#9997;',
+      title:'Children\u2019s Bill of Rights in Sport',
+      badge:'Safeguarding',
+      source:'Project Play / Aspen Institute',
+      url:'https://projectplay.org/childrens-rights-and-sports',
+      summary:'Eight rights every child holds when they step onto a sports field. Understanding these rights is the foundation of ethical coaching.',
+      content:'Developed by the Aspen Institute through Project Play, the Children\u2019s Bill of Rights in Sports identifies eight fundamental rights that every child holds in a sporting environment. These are not aspirations \u2014 they are the minimum standard for any coach working with young people.\n\nThe eight rights:\n\n1. The right to play sports \u2014 Every child deserves access to participation, regardless of ability, background, or circumstance.\n\n2. Safe and healthy environments \u2014 Free from all forms of abuse: physical, emotional, and psychological. This includes pressure, humiliation, and exclusion.\n\n3. Qualified programme leaders \u2014 Coaches who are trained, background-checked, and committed to ongoing development.\n\n4. Developmentally appropriate play \u2014 The game should match the child\u2019s physical, mental, and emotional maturity \u2014 not the ambitions of adults.\n\n5. Fair and equitable treatment \u2014 Every child receives meaningful playing time and is treated with dignity regardless of ability.\n\n6. The right to have fun \u2014 Enjoyment is not a bonus. It is the primary reason children play, and the primary driver of long-term participation.\n\n7. The right to make decisions \u2014 Children have a say in their sporting experience. Their voice matters and their autonomy develops through being heard.\n\n8. The right to a future in sport \u2014 No child should be specialised, overloaded, or burned out before they have had the chance to discover their full potential.\n\nAs a coach, these rights are not a checklist. They are a lens through which every session, every selection decision, and every interaction with a player should be viewed.',
+    },
+    {
+      id:'mental-hygiene',
+      icon:'&#129504;',
+      title:'Mental Hygiene \u2014 The 533 Method',
+      badge:'Wellbeing',
+      source:'Get Fit Fly Right',
+      url:'https://www.getfitflyright.com/about',
+      summary:'A four-minute breathing practice that resets the mind, redirects attention, and prepares players to receive new information. Developed by Coach D. Williams for youth athletes.',
+      content:'Mental hygiene is the practice of maintaining emotional and psychological health the same way we maintain physical fitness \u2014 consistently and intentionally. Coach D. Williams of Get Fit Fly Right developed the 533 Method as a daily practice for youth athletes and the adults who work with them.\n\nThe 533 Method is a four-minute breathing sequence:\n\u2022 5 deep breaths for conscious awareness \u2014 slowing the nervous system and anchoring attention to the present\n\u2022 3 fast breaths to activate the core \u2014 energising the body and building focus\n\u2022 3 loud breaths to release tension \u2014 physically discharging stress and resetting emotional state\n\nWhy this matters for coaching:\n\nThe brain uses roughly a fifth of the body\u2019s oxygen. When stress or anxiety restricts breathing, cognitive function drops \u2014 players make poorer decisions, absorb less coaching, and struggle to regulate their emotions. Intentional breathing directly addresses this.\n\nThe TAP Method (The Athlete Project) builds on 533 through three pillars: Awareness (recognising your emotional state), Development (building the skills to manage it), and Normalisation (making mental hygiene a daily habit rather than a crisis response).\n\nHow to use this in your sessions:\n\nOpen a session with 533 after the physical warm-up. Thirty seconds of quiet breathing before a game or a hard training moment changes the quality of everything that follows. You are not wasting time. You are preparing the brain to learn.',
+    },
+    {
+      id:'redwood',
+      icon:'&#127795;',
+      title:'The Redwood Tree \u2014 A Team Metaphor',
+      badge:'Culture',
+      source:'FAS Original',
+      url:'',
+      summary:'Redwood trees are the tallest living things on earth. Their secret is not their height \u2014 it is their roots. The most powerful metaphor for what a team culture actually is.',
+      content:'The coastal redwood can grow over 350 feet tall. The oldest are over 2,000 years old. They survive fires, storms, and centuries of change. And they do it with a root system that barely goes 12 feet deep.\n\nThe secret is not depth. It is connection.\n\nRedwood roots grow outward and intertwine with the roots of every other redwood around them. They share nutrients. When one tree is stressed, the system supports it. No single tree stands alone. The forest is the foundation.\n\nThis is your team.\n\nTalent is the trunk \u2014 it gets attention, it is visible, it is what people measure. But talent without connection does not survive pressure. The teams that hold together when things get hard \u2014 when you are losing, when players are injured, when the season is not going how anyone planned \u2014 are the teams whose roots are intertwined.\n\nHow you build the root system:\n\u2022 The check-in before training \u2014 thirty seconds where you actually look at each player and see them\n\u2022 The team values created by the players, not handed down by the coach\n\u2022 The post-game circle where players speak before the coach does\n\u2022 The quiet conversation with the player who is struggling that has nothing to do with football\n\nThe redwood does not grow tall by competing with the tree next to it. It grows tall because of the tree next to it.\n\nThe question for your team this week: are your roots growing together, or are they still growing separately?',
+    },
+    {
+      id:'circle',
+      icon:'&#11093;',
+      title:'The Power of the Circle',
+      badge:'Culture',
+      source:'FAS Original',
+      url:'',
+      summary:'Why the circle is the most powerful shape in coaching \u2014 and why cultures across history have known this long before sport did.',
+      content:'The circle is not an accident of coaching tradition. It is one of the oldest symbols of human connection in existence.\n\nIn Lakota culture, the circle represents the wholeness of life \u2014 the sun, the moon, the seasons, the cycle of birth and return. Black Elk, the Oglala Lakota holy man, described it this way: the power of the world always works in circles, and everything tries to be round. In many Indigenous traditions, the circle is used deliberately in ceremony and council to signal that every voice carries equal weight. No one sits at the head of a circle.\n\nThe same principle appears in Celtic tradition, in African ubuntu philosophy, in Japanese concepts of harmony. Different cultures, same understanding: the circle creates conditions where people feel equally seen and equally heard.\n\nIn coaching, the circle does something that no other formation does. When players gather in a line or a cluster, there is always a front and a back, a centre and a periphery. Someone is more visible. Someone is less. The circle removes that hierarchy. Every player faces every other player. The coach is part of the circle, not above it.\n\nHow to use the circle:\n\nOpen every session in a circle \u2014 not to deliver instructions, but to ask a question. A genuine one. \u201cWhat are you bringing to training today?\u201d Close every session in a circle. Let a player lead it. Ask what they noticed. Ask what they want to carry forward.\n\nThe circle tells your players something before a word is spoken: in this space, you belong. Your presence here matters. We are here together.\n\nThat is the foundation every session is built on.',
+    },
+  ];
+
+  const cats=['All','Coaching Practice','Connection','Player Development','Philosophy','Technical','Safeguarding','Wellbeing','Culture'];
+  $('subNav').innerHTML='';
+
+  const catsHtml=cats.map(c=>'<button class="tab-btn'+(c==='All'?' active':'')+'" onclick="Resources.filter(this,\''+c+'\')" style="font-size:11px;padding:5px 12px">'+c+'</button>').join('');
+
+  const cardsHtml=guides.map(g=>'<div class="res-card" data-cat="'+g.badge+'" onclick="Resources.open(\''+g.id+'\')">'
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">'
+      +'<div style="font-size:28px">'+g.icon+'</div>'
+      +'<span class="badge badge-lime" style="font-size:10px">'+g.badge+'</span>'
+    +'</div>'
+    +'<div style="font-size:14px;font-weight:700;color:var(--dark);margin-bottom:5px">'+g.title+'</div>'
+    +'<div style="font-size:11px;color:var(--lime-muted);margin-bottom:6px">'+g.source+'</div>'
+    +'<p style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:10px">'+g.summary+'</p>'
+    +'<div style="font-size:12px;color:var(--lime);font-weight:600">Read guide &#8594;</div>'
+    +'</div>').join('');
+
+  setMain('<div class="page-header"><div><h1>Resources</h1><p>Coaching guides, frameworks, and tools</p></div></div>'
+    +'<div class="page-body">'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px">'+catsHtml+'</div>'
+      +'<div class="grid-2" id="resGrid">'+cardsHtml+'</div>'
+    +'</div>');
+
+  // Store guides for modal
+  Resources._guides=guides;
+},
+
+filter(btn,cat){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.res-card').forEach(c=>{
+    c.style.display=(cat==='All'||c.dataset.cat===cat)?'':'none';
+  });
+},
+
+open(id){
+  const g=Resources._guides.find(r=>r.id===id);
+  if(!g)return;
+  const m=document.getElementById('addPlayerModal');
+  if(!m)return;
+  m.querySelector('.modal-content').innerHTML='<div class="modal-body" style="max-height:80vh;overflow-y:auto">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+      +'<div style="font-size:32px">'+g.icon+'</div>'
+      +'<div><div style="font-size:16px;font-weight:700">'+g.title+'</div>'
+      +'<div style="font-size:11px;color:var(--lime-muted)">'+g.source+(g.url?' &middot; <a href="'+g.url+'" target="_blank" style="color:var(--lime)">Original article &#8599;</a>':'')+'</div></div>'
+    +'</div>'
+    +'<div style="font-size:13px;line-height:1.8;white-space:pre-line;color:var(--text)">'+g.content+'</div>'
+    +'<button class="btn btn-primary" onclick="closeModal(\'addPlayerModal\')" style="margin-top:18px;width:100%">Close</button>'
+    +'</div>';
+  openModal('addPlayerModal');
+},
+
+_guides:[],
+};
+
 
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 (async()=>{
