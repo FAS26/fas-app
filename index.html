@@ -454,148 +454,299 @@ const Framework={
 
   getAgeContext(ageGroup){
     const n=ageNum(ageGroup);
-    if(n<=8)return{
-      phase:'Discovery Phase — U7/U8 (4v4)',
+
+    // U6-U7: Discovery I
+    if(n<=7)return{
+      phase:'Discovery Phase I — U6/U7 (4v4 or free play)',
       dev:'Early Childhood',
-      coaching:`COACHING APPROACH FOR THIS AGE: Be enthusiastic, animated, FUN and supportive. Use SHORT instructions — very limited attention span. Use the language of the child. Provide positive SPECIFIC praise. Encourage creativity and autonomous decision-making. Encourage learning from mistakes. Build self-esteem and self-confidence. DO NOT use tactical language — focus on fun, movement, ball contact. Players are learning to dribble, shoot and pass in simple situations.`,
-      targets:{qi:0.3,pc:3,hq:2,freeze:1},
-      qiLabel:'≥ 0.3',pcLabel:'≥ 3:1',
-      focusKeywords:['fun','try again','great effort','well done','your turn','show me','go on','nice try','brilliant'],
-      gameMoments:'Attacking and defending introduced very simply — focus on scoring goals and winning the ball back.',
+      targets:{qi:0.2,pc:5,hq:0,freeze:0},
+      gradeWeights:{energy:30,language:30,ballContact:25,praise:15},
+      coaching:`AGE-SPECIFIC COACHING STANDARD (U6/U7):
+WHAT MATTERS MOST: Energy, enthusiasm, smiles, and movement. This is not a tactical environment.
+INDIVIDUAL FOCUS: One player, one ball whenever possible. Every drill should have a ball at every player's feet.
+TECHNICAL ONLY: Dribbling is the primary skill. Keep the ball close, change direction, use both feet.
+LANGUAGE: Use the simplest, most visual language possible. If you cannot explain it with a gesture or a fun image, simplify it further.
+QUESTIONS: Only low-order recall questions appropriate — "What do we do with the ball?" "Show me!"
+HIGH-ORDER QUESTIONS: NOT expected or appropriate at this age. Do not penalise absence of high-order questions.
+TACTICS: Zero tactical coaching. Do not discuss positions, shape, or game moments.
+COGNITIVE: Players are learning through imitation and repetition. Keep instruction under 10 seconds.
+PHYSICAL: Short bursts. Rest when needed. Maximum fun.
+SOCIAL: Build confidence. Every player gets individual attention and specific praise.
+EMOTIONAL: Celebrate effort, not outcome. Never single out mistakes in front of the group.
+LANGUAGE EXAMPLES (use these as benchmarks): "Pretend the ball is glued to your foot!" / "Be a sneaky snake — keep the ball close!" / "Show me your fastest feet!" / "Every player needs their own ball — one player, one ball!"
+RED FLAGS AT THIS AGE: Tactical instructions, group demonstrations without a ball, long pauses in play, players standing in lines waiting, coach talking for more than 15 seconds.`,
+      gameMoments:'Not applicable. Focus solely on individual ball mastery and enjoying the game.',
     };
+
+    // U8: Discovery II
+    if(n<=8)return{
+      phase:'Discovery Phase II — U8 (4v4)',
+      dev:'Early Childhood',
+      targets:{qi:0.25,pc:4,hq:1,freeze:1},
+      gradeWeights:{energy:25,language:30,ballContact:25,praise:20},
+      coaching:`AGE-SPECIFIC COACHING STANDARD (U8):
+WHAT MATTERS MOST: Fun, individual skill development, positive energy. Every player touches the ball constantly.
+INDIVIDUAL FOCUS: One player, one ball for technical work. 1v1 situations are the primary game model.
+TECHNICAL FOCUS: Dribbling is primary. Shooting. Beginning to pass. Spatial awareness growing.
+DEFENDING: Individual defending — how do I win my ball back? Not positional defending.
+LANGUAGE: Age-appropriate, visual, and fun. Use relatable metaphors the child experiences daily.
+METAPHOR EXAMPLES (what excellent looks like): 
+  - Spreading out: "When you make a peanut butter sandwich, do you leave it in a clump? No — you spread it out! When I say Peanut Butter, what are you going to do? SPREAD OUT!"
+  - Passing: "Pretend your belly button is a laser beam. Point your laser where you want the ball to go before you kick it."
+  - Receiving: "Make your foot a pillow and the ball is an egg — soft touch!"
+  - Dribbling: "Keep the ball on a leash — it can't run away from you!"
+QUESTIONS: Simple guided questions. "What did you do there?" "Where did you look?" "Show me again."
+HIGH-ORDER QUESTIONS: 1 expected. Simple what/where questions in the flow of play.
+TACTICS: Zero. Do not discuss team shape or positions.
+RED FLAGS: Group standing and listening. Tactical instructions. Players without balls. Coach talking more than playing. Comparing players.`,
+      gameMoments:'Attacking: scoring goals, keeping the ball. Defending: winning the ball back individually.',
+    };
+
+    // U9-U10: Foundation I
     if(n<=10)return{
       phase:'Foundation Phase I — U9/U10 (7v7)',
-      dev:'Middle/Late Childhood',
-      coaching:`COACHING APPROACH FOR THIS AGE: Be enthusiastic, animated, FUN. Work on a specific topic but keep it simple. Help players understand their role. ENCOURAGE players to provide input and feedback — brainstorm collectively for solutions. Challenge the individual player's level and emphasize EFFORT OVER OUTCOME. Acknowledge frustrations and help develop coping strategies. Empower players to resolve conflict. Recognise individual differences. Be wary of verbal comparisons. Zero tolerance for bullying. Use routines and low-level structure.`,
+      dev:'Middle Childhood',
       targets:{qi:0.4,pc:3,hq:3,freeze:2},
-      qiLabel:'≥ 0.4',pcLabel:'≥ 3:1',
-      focusKeywords:['what do you see','good try','effort','well done','show me','what happened','why','look up','who is free'],
-      gameMoments:'All four game moments introduced. Players developing attacking shape (height/width/depth), defending compactness, and transitions.',
+      gradeWeights:{questions:30,praise:25,metaphors:20,ballTime:25},
+      coaching:`AGE-SPECIFIC COACHING STANDARD (U9/U10):
+WHAT MATTERS MOST: Developing the love of the game while introducing collective play. Effort over outcome always.
+GROUP FOCUS: 2 players, 1 ball — solving problems together in possession. 2v1 and 2v2 are the primary game model.
+DEFENDING: Defending in pairs. Pressure and Cover (two defenders — one pressures, one covers behind).
+POSITIONS: Beginning to discuss positions within the team — not rigid, but introducing role awareness.
+LANGUAGE: Continue using visual metaphors and relatable comparisons. Players understand more now but still need pictures.
+METAPHOR EXAMPLES:
+  - Creating width: "Stretch the field like stretching a rubber band — if we are all in the middle, there is no space."
+  - Support angle: "Be the escape route — your teammate needs to see you when they look up."
+  - Defensive pressure: "Be a wall — get between the ball and our goal."
+QUESTIONS: Guided questions during stoppages and in flow. "What did you see?" "Where was your teammate?" "What would you do differently?"
+HIGH-ORDER QUESTIONS: 3 expected. "Why did you make that decision?" "What other options did you have?" "What would happen if...?"
+ENCOURAGE PLAYER INPUT: Brainstorm solutions collectively. Ask players what they think before offering your answer.
+COPING WITH MISTAKES: Acknowledge frustration. "That's hard — what are you going to try next time?"
+POSITIONS INTRODUCTION: Players should hear position names. Not fixed, but rotating so all players experience all areas.
+RED FLAGS: Individual-only focus with no 2v1 or 3v1 work. No questions asked. High correction-to-praise ratio. Tactics used without relating to the specific game moment.`,
+      gameMoments:'All four game moments introduced. Attacking: height, width, depth. Defending: compactness, pressure-cover. Transitions both ways.',
     };
+
+    // U11-U12: Foundation II
     if(n<=12)return{
-      phase:'Foundation Phase III — U11/U12 (9v9)',
-      dev:'Late Childhood / Early Adolescence',
-      coaching:`COACHING APPROACH FOR THIS AGE: Encourage collaboration — players can understand the game and use teammates to solve problems. Be patient with players eager to learn — find the right level of challenge. Help each player develop at their own rate — do NOT compare players to each other. Use different TYPES of questions to engage players. Encourage and support multiple roles and positions. Players are beginning abstract thinking and self-regulation. Group reflection skills are being developed. Players lead the warm-up routine.`,
-      targets:{qi:0.5,pc:3,hq:4,freeze:2},
-      qiLabel:'≥ 0.5',pcLabel:'≥ 3:1',
-      focusKeywords:['what do you see','why','what would you do','show me','well done','great communication','switch it','find the free player','play forward'],
-      gameMoments:'All four game moments: attacking (height/width/depth, overload wide, switch play), defending (compact block, build pressure), transitions (immediate pressure, play forward quickly).',
+      phase:'Foundation Phase II — U11/U12 (9v9)',
+      dev:'Late Childhood',
+      targets:{qi:0.5,pc:3,hq:5,freeze:2},
+      gradeWeights:{questions:30,tactical:25,positional:20,praise:25},
+      coaching:`AGE-SPECIFIC COACHING STANDARD (U11/U12):
+WHAT MATTERS MOST: Role within the team. How do I contribute to the group? Players developing identity within a system.
+GROUP FOCUS: 3 players, 1 ball — solving problems together. Triangles, combination play, third-man runs.
+DEFENDING: Defending in pairs and beginning to introduce the third defender — Balance. Pressure, Cover, Balance as a three.
+POSITIONS: Specific to positions within the team. Coaching should reference the player's role. "As a central midfielder, when we lose the ball, your first job is..."
+TEAM IDENTITY: What is my role and how do I carry it out for the team? Players should understand their responsibilities in all four game moments.
+LANGUAGE: Richer technical and tactical vocabulary is appropriate. Still use metaphors but build football-specific language alongside them.
+METAPHOR EXAMPLES:
+  - Third-man run: "You are the surprise guest at the party — arrive at the right moment."
+  - Pressing trigger: "The trigger is the bad touch — the moment the other team makes a mistake, that is our signal."
+  - Depth in attack: "The striker is our anchor — they stretch the defence so the midfielders have space."
+QUESTIONS: High-order questions are important here. "Why did you choose that pass?" "What did your movement create for your teammates?" "If the ball goes wide, where does everyone else shift?"
+HIGH-ORDER QUESTIONS: 5 expected. Questions should connect individual actions to team outcomes.
+FREEZE MOMENTS: 2 expected. Coach should freeze, ask a question, demonstrate with a ball (not talk at players), rehearse, restart. ALL players on the relevant team should receive coaching — not just the player with or closest to the ball.
+POSITION-SPECIFIC FEEDBACK: When coaching, reference what the correct behaviour looks like for that specific role. Central defender, wide midfielder, striker — each has different cues.
+RED FLAGS: Generic feedback not specific to position. Freeze moments where coach talks instead of demonstrating with the ball. Coaching only the player on the ball during freeze moments. No reference to team shape.`,
+      gameMoments:'All four game moments with positional responsibilities. Attacking: third-man combinations, width and depth from specific roles. Defending: pressure-cover-balance as a unit.',
     };
+
+    // U13-U14: Progression I
     if(n<=14)return{
       phase:'Progression Phase I — U13/U14 (11v11)',
-      dev:'Adolescence',
-      coaching:`COACHING APPROACH FOR THIS AGE (US Soccer C License standard): Use HIGH-ORDER questions to develop player thinking — "What do you see?", "Why?", "What would happen if?", "How would you?". Be supportive, challenge appropriately, prevent/manage conflict. Educate players and provide AUTONOMY for them to lead activities including warm-up routines. Encourage collaboration — players should understand the game, anticipate problems and use teammates to solve them. Promote players to ask questions and provide input and feedback to each other. Promote individuality within the team setting. Be aware of early and late developers. Be wary of verbal comparisons and over-criticising (zero tolerance for bullying). Acknowledge frustrations and help develop coping strategies. Empower players to resolve conflict. Incorporate routines and moderate-level structure. Understand when to GUIDE versus when to COMMAND (use different types of questions — higher order questions — to engage players). Q:I ratio target ≥ 0.5, ideal ≥ 0.7.`,
-      targets:{qi:0.5,pc:3,hq:5,freeze:3},
-      qiLabel:'≥ 0.5',pcLabel:'≥ 3:1',
-      gameMoments:'ATTACKING: Play forward through individual actions and combinations — height/width/depth, break lines, finish the attack. ATTACKING TO DEFENDING TRANSITION: Apply immediate pressure, delay counterattack, recover with speed. DEFENDING: Compact block, build pressure on the ball, deny the finish. DEFENDING TO ATTACKING: Play forward quickly, secure the ball, join the attack with speed.',
+      dev:'Early Adolescence',
+      targets:{qi:0.6,pc:3,hq:7,freeze:3},
+      gradeWeights:{questions:30,tactical:30,autonomous:20,praise:20},
+      coaching:`AGE-SPECIFIC COACHING STANDARD (U13/U14):
+WHAT MATTERS MOST: How do I perform at my best within the role I am playing? Player understanding of the WHY behind every action.
+TACTICAL DEPTH: Coaching must be specific to player behaviours — both technical execution AND tactical decision-making. Not just "what to do" but "when, why, where, and how."
+THE WHY: Coach the Why, When, How, Where and What of every action within the specific game moment. "We press here BECAUSE the ball is in a wide area and the opposition has limited passing options. WHY does that matter? It forces them backwards and gives us momentum."
+FREEZE MOMENTS: 3 expected. Critical standard: when the coach freezes play, ALL players on the relevant team must receive coaching — the player on the ball, the players near the ball, AND the players away from the ball. Everyone has a role in every moment. Coach the whole team within the game moment being worked on.
+CUES AND TRIGGERS: Coach should name the specific cues that trigger each player behaviour. "The trigger to press is when their centre-back receives with their back to goal — that is your signal."
+PLAYER BEHAVIOURS: Coach must name specific technical and tactical behaviours expected. "I want to see you arrive at the ball with pace, body angle to play forward, and head up before you receive."
+QUESTIONS: High-order questions are primary. 7 expected. "What did you notice about their defensive shape before you received?" "Why did you choose to play inside rather than switch?" "What would change if we pressed higher?"
+PLAYER AUTONOMY: Player-led moments are a strength. Let players solve problems. Intervene with questions, not answers.
+EMOTIONAL: Acknowledge the complexity of the game at this age. Catch players being good — specific praise by name for the right behaviours in the right moments.
+LANGUAGE EXAMPLES: "The trigger for your run is the moment the fullback's weight shifts forward." / "Your job without the ball is to create a passing option — are you in a position your teammate can actually use you?" / "What does the shape of their midfield tell you about where the space is?"
+RED FLAGS: Coaching only the player on or nearest the ball in a freeze. No cues or triggers named. Generic team praise without specific behaviours identified. Questions with single-word answers only.`,
+      gameMoments:'All four game moments with full 11v11 shape. Specific roles in attack and defence. Transition speed and shape as a team priority.',
     };
+
+    // U15-U18: Progression II+
     return{
-      phase:'Progression Phase II — U15/U16 (11v11)',
+      phase:'Progression Phase II — U15-U18 (11v11)',
       dev:'Adolescence',
-      coaching:`COACHING APPROACH FOR THIS AGE (US Soccer C License standard): Support players in finding PERSONAL FULFILMENT through increased player autonomy while gaining a deeper game understanding. Place more focus on SPECIFIC INDIVIDUAL DEVELOPMENT. Be patient — development takes time and players develop at different rates. Recognise the impact of growth and maturation on performance. INCLUDE PLAYERS IN THE PLANNING PROCESS. Use cues and key words to create focus and refocus — effective for maintaining concentration. Players at this age ask "Why?" frequently — be ready with real answers grounded in the game. Develop self-efficacy, self-reflection and self-regulation skills. Develop teamwork through group goal setting and mutual support. Use of positional games (rondos). Introduce positional profiles — place more focus on individual responsibilities within a position.`,
-      targets:{qi:0.6,pc:3,hq:6,freeze:3},
-      qiLabel:'≥ 0.6',pcLabel:'≥ 3:1',
-      gameMoments:'All U13/U14 principles plus: U15/U16 adds "Create high defensive shape behind the ball", "Protect space in behind: anticipate long ball", "Create passing option: look to run in behind", and "Create prevention shape behind the ball" in transitions.',
+      targets:{qi:0.7,pc:3,hq:9,freeze:3},
+      gradeWeights:{tactical:35,positional:30,autonomous:20,praise:15},
+      coaching:`AGE-SPECIFIC COACHING STANDARD (U15-U18):
+WHAT MATTERS MOST: Players playing specific positions. Feedback must be highly specific to the position and its demands within the team shape.
+POSITION-SPECIFIC COACHING: Every piece of feedback should connect to the positional role. What does a right back need to do in this moment? What does the number 10 need to do when we transition? Generic feedback is not acceptable at this age.
+TACTICAL COACHING IS VITAL: How does what you are coaching relate to the team as a whole? Individual excellence only matters if it serves the collective. Always connect individual actions to team outcomes.
+THE WHOLE TEAM IN EVERY FREEZE: In a freeze moment, the coach must coach every player on the relevant team — the player in possession, the nearest support, AND the players making runs, holding shape, or providing balance away from the ball. The game is 11v11. Every player has a role in every moment.
+PLAYER-LED: At this age, players should be initiating conversations, asking questions, and evaluating themselves. If the coach is doing all the talking, something is wrong.
+CUES AND TRIGGERS: Highly specific. "Your trigger to make that third-man run is the moment our central midfielder plays back to the defender — that is your cue to move."
+PHYSICAL FULFILMENT: Acknowledge the physical demands. Connect technical execution to physical capacity. "At this intensity, your touch needs to be quicker — one touch to control, one touch to play."
+PERSONAL FULFILMENT: Connect the game to their individual goals. What kind of player do you want to be? Every decision in training is practice for who you are becoming.
+QUESTIONS: 9+ high-order questions expected. Questions should be complex and connect individual moments to system-level outcomes.
+LANGUAGE: Full tactical vocabulary. No need for simplified metaphors — use position-specific language, game moment language, and phase-of-play language.
+RED FLAGS: Generic coaching not specific to position. Freeze moments that coach only the ball-near players. Coach solving problems instead of players solving them. No connection between individual actions and team shape.`,
+      gameMoments:'All four game moments in full 11v11 context. Position-specific roles, triggers, cues, and individual-to-team connections required.',
     };
   },
 
   getLicenseStandards(){
-    return`US SOCCER C/D LICENSE COACHING EVALUATION STANDARDS:
+    return `C/D LICENSE EVALUATION FRAMEWORK — THREE AREAS:
 
 AREA 1 — PLANNING:
-• Session objective aligned with age group learning plan
-• Game moment identified (Attacking / Attacking-to-Defending / Defending / Defending-to-Attacking)
-• Principles, sub-principles and player actions identified
-• 5Ws: WHO (primary/secondary players), WHAT (phase of play), WHERE (field location), WHEN (decision cues from opposition), WHY (principles behind successful behaviour)
-• Coaching interactions defined — HOW and WHEN
+- Is there a clear game moment identified (Attacking / A-to-D Transition / Defending / D-to-A Transition)?
+- Is there a Main Principle (e.g. "Combination play in the middle third")?
+- Is there a Sub Principle (e.g. "Third-man runs to break defensive lines")?
+- Do the Player Actions (technical and tactical behaviours) align with the Main and Sub Principle?
+- Are Coaching Points written in player behaviour language ("Players will..." not "Coach will...")?
+- Does the session reflect the age group's developmental stage (Cognitive, Physical, Social, Emotional, Language)?
+- Is the 5Ws framework evident: Why are we working on this? What do I want to see? When does it happen? Where on the field? Who is responsible?
 
 AREA 2 — ORGANISATION:
-• Ball rolling time maximised — players playing, not listening
-• Field set up replicates the game moment
-• Activity complexity appropriate for the challenge level
-• Efficient transitions between activities
-• Optimal ratio of successful to unsuccessful player actions
+- Was ball rolling time maximised? (Players should be doing, not watching)
+- Did the coach transition quickly between activities?
+- Was the challenge level appropriate for the age group?
+- Were all players active? (No lines, no waiting, no standing)
+- Were demonstrations planned and used with a ball (not without)?
 
-AREA 3 — COACHING INTERACTIONS (most important):
-THREE types of interaction evaluated:
-
-1. POSITIVE REINFORCEMENT: Verbal feedback acknowledging specific actions executed well. Focus on highlighting steps within the PROCESS, not just outcome. Specific praise by name ("Marcus, that run behind the line created the space") not general ("great run"). 
-
-2. MODEL / DEMONSTRATE: Explicitly show the execution of the player action using the BALL — paint the picture. FREEZE → DEMO (with ball) → REHEARSE → RESTART. Do NOT bring players in and talk at them. The ball demonstrates, not words.
-
-3. QUESTIONING / GUIDED PROBLEM SOLVING: Questions that incite curiosity, exploration, creativity and discovery. Connected to the session objective. HIGH-ORDER: "What do you see?", "Why?", "What would you do?", "What if?", "How?" — these develop game intelligence. LOW-ORDER: "Did you?", "Where?", "Who?" — recall only. Target: majority of questions should be high-order.`;
+AREA 3 — COACHING INTERACTIONS:
+HOW the coach intervened:
+- Positive Reinforcement (catching players being good — specific, by name)
+- Guided Questions → Direct Feedback (questions first, direction when needed)
+- Demonstration using the ball to paint the picture
+- Key words/Player Actions connected to the session topic
+WHEN the coach intervened:
+- Introduction
+- Throughout the exercise (sideline coaching, in the flow)
+- Planned stoppages (water break, interval)
+- Natural stoppages (ball out of play)
+- In-the-situation FREEZE: Freeze → Ask a Question → Demo with ball → Rehearse → Restart
+FREEZE STANDARD: The ball demonstrates. Coach does NOT bring players in and lecture. The question comes first, the ball shows the answer, players rehearse, play restarts.`;
   },
 
   buildAIPrompt(transcript,title,ageGroup,metrics,isGameDay=false){
     const ctx=this.getAgeContext(ageGroup);
     const standards=this.getLicenseStandards();
+    const n=ageNum(ageGroup||'U10');
     const sessionType=isGameDay?'GAME DAY COACHING REPORT':'TRAINING SESSION TRANSCRIPT';
 
-    return`You are a senior US Soccer coaching educator evaluating a ${sessionType} using the US Soccer Player Development Framework and the C/D License coaching evaluation standards.
+    // Age-specific grading rubric
+    let gradingRubric='';
+    if(n<=7){
+      gradingRubric=`GRADING RUBRIC FOR U6/U7:
+A: High energy and enthusiasm throughout. Every player has a ball. Instructions under 10 seconds. Visual metaphors used naturally. Specific individual praise by name. Zero tactical language. Players smiling and moving constantly.
+B: Good energy. Most players active with a ball. Some good metaphors or fun language. Generally positive. Minor instances of over-instruction or tactical language.
+C: Adequate energy but some long instruction periods. Occasional tactical language. Some players standing. Limited use of fun visual language.
+D: Coach-dominated session. Long explanations. Tactical instructions inappropriate for age. Players waiting in lines. Limited individual ball contact.
+DO NOT penalise absence of high-order questions at this age. DO NOT expect tactical awareness.`;
+    } else if(n<=8){
+      gradingRubric=`GRADING RUBRIC FOR U8:
+A: Fun, energetic session. Individual player focus (one player one ball). Excellent visual metaphors and relatable comparisons used (belly button laser, foot as a pillow, peanut butter spreading). 1v1 situations primary game model. Specific praise by name. At least 1 guided question. Zero tactical group instruction.
+B: Good energy. Individual focus maintained. Some use of visual language. Positive environment. Minor tactical language creeping in.
+C: Some fun moments but instruction-heavy periods. Limited visual language. Some tactical group coaching. Players not always active with a ball.
+D: Tactical instructions dominant. Group standing and listening. No visual metaphors. High correction ratio.
+DO NOT penalise absence of high-order questions at this age.`;
+    } else if(n<=10){
+      gradingRubric=`GRADING RUBRIC FOR U9/U10:
+A: 2v1 and 2v2 situations primary model. Visual metaphors used alongside growing football vocabulary. Defending in pairs (pressure-cover) introduced. Player input sought. At least 3 high-order questions. Brainstorming solutions collectively. Effort praised over outcome. Positions introduced without being rigid.
+B: Good collective focus. Some good questions. Mostly positive environment. Some positional awareness introduced. Minor over-instruction.
+C: Some collective play but coach-directed. Few questions. Limited positional introduction. Praise inconsistent.
+D: Individual-only focus with no collective problem solving. No questions. High correction ratio. No positional awareness introduced.`;
+    } else if(n<=12){
+      gradingRubric=`GRADING RUBRIC FOR U11/U12:
+A: Position-specific coaching present. 3v1/3v2 game model. Pressure-Cover-Balance introduced for defending. At least 5 high-order questions. Freeze moments (2+) with ball demonstration — coaching ALL players not just ball-carrier. Questions connect individual actions to team outcomes. Rich metaphors alongside football vocabulary.
+B: Good positional awareness coaching. 4+ questions. At least 1 freeze with ball demo. Some team connection in feedback.
+C: Some positional coaching but not consistent. 2-3 questions. Freeze moments without ball demo. Coaching only ball-carrier.
+D: Generic coaching. No positional reference. Few questions. No freeze moments or poor freeze technique. No connection to team shape.`;
+    } else if(n<=14){
+      gradingRubric=`GRADING RUBRIC FOR U13/U14:
+A: Every freeze moment coaches ALL players on the relevant team — player with ball, support players, AND players away from ball. Cues and triggers named specifically. Why/When/How/Where/What explained. 7+ high-order questions. Player behaviours named precisely. Player autonomy moments present.
+B: Good tactical depth. 5-6 questions. Freeze moments reasonably complete. Some cues and triggers named. Mostly specific to positions.
+C: Some tactical coaching but generic. 3-4 questions. Freeze moments incomplete (only ball-near players coached). Cues not named.
+D: Generic coaching. Tactical language without specifics. Few questions. Poor freeze technique. Not coaching the whole team in freeze moments.`;
+    } else {
+      gradingRubric=`GRADING RUBRIC FOR U15-U18:
+A: Highly position-specific coaching. Every freeze coaches the whole team. Cues and triggers precise and connected to system. 9+ high-order questions. Players solving problems. Coach facilitating not directing. Individual actions connected to team outcomes. Physical and personal fulfilment referenced.
+B: Good positional specificity. 7-8 questions. Freeze mostly complete. Some system-level connections.
+C: Some position-specific coaching but inconsistent. 4-6 questions. Coach still directing too much. Individual actions not connected to team.
+D: Generic coaching. Not position-specific. Coach-dominated. Few questions. No system-level thinking evident.`;
+    }
+
+    return `You are Jamie McLeod, a senior US Soccer coaching educator with expertise in the Player Development Framework and C/D License evaluation. You are evaluating a ${sessionType} submitted by a coach for professional feedback.
+
+Your feedback must be SPECIFIC to this age group (${ageGroup}), this session, and what you actually observe in the transcript. Generic feedback that could apply to any coach at any age is NOT acceptable.
 
 ${sessionType}: "${title}" | Age Group: ${ageGroup||'Unknown'}
 Developmental Stage: ${ctx.dev} | Framework Phase: ${ctx.phase}
 
 ${ctx.coaching}
 
-GAME MOMENTS CONTEXT FOR THIS AGE GROUP:
-${ctx.gameMoments}
-
 ${standards}
 
-FREEZE MOMENT STANDARD:
-The freeze moment follows: FREEZE → DEMO (use the ball to paint the picture) → REHEARSE → RESTART.
-The coach should NOT bring players in and talk at them. The ball demonstrates. After the demo, players rehearse the solution, then restart.
-A great freeze moment: coach freezes the play, asks a question ("What do you see?"), demonstrates with the ball, asks players to try it, then restarts.
-Evaluate whether stoppages in the transcript reflect this standard.
+${gradingRubric}
 
 METRICS DETECTED FROM TRANSCRIPT:
-- High-order questions: ${metrics.high_order_q} | Low-order questions: ${metrics.low_order_q}
-- Individual praise: ${metrics.individual_praise} | Team praise: ${metrics.team_praise}
+- Q:I ratio: ${metrics.qi_ratio} (target for ${ageGroup}: ${ctx.targets.qi})
+- P:C ratio: ${metrics.pc_ratio} (target: 3.0 minimum)
+- High-order questions: ${metrics.high_order_q} (target: ${ctx.targets.hq})
+- Low-order questions: ${metrics.low_order_q}
+- Individual praise: ${metrics.individual_praise}
+- Team praise: ${metrics.team_praise}
 - Positive reinforcement: ${metrics.positive_reinforcement}
-- Technical feedback: ${metrics.technical_feedback} | Tactical feedback: ${metrics.tactical_feedback}
-- Check for understanding: ${metrics.check_for_understanding}
-- Demonstrations / Show me: ${metrics.show_me_count}
+- Technical feedback: ${metrics.technical_feedback}
+- Tactical feedback: ${metrics.tactical_feedback}
+- Demonstrations: ${metrics.show_me_count}
 - Freeze moments: ${metrics.freeze_moment}
-- Q:I ratio: ${metrics.qi_ratio} (target: ${ctx.targets.qi})
-- P:C ratio: ${metrics.pc_ratio} (target: 3.0)
 - Words spoken: ${metrics.word_count}
 
-TRANSCRIPT (first 2800 chars):
-${transcript.slice(0,2800)}
+TRANSCRIPT (first 3000 chars):
+${transcript.slice(0,3000)}
 
-Respond ONLY with valid JSON — no preamble, no backticks:
+EVALUATION INSTRUCTIONS:
+1. Grade this session AGAINST THE SPECIFIC RUBRIC for ${ageGroup} above — not a generic standard
+2. Encouragement must reference ACTUAL BEHAVIOURS from the transcript — quote or paraphrase specific moments
+3. Focus areas must be AGE-APPROPRIATE — do NOT suggest high-order questions for U6/U7/U8 as a primary concern
+4. Actions must be SPECIFIC and ACTIONABLE for this age group and session topic
+5. If the coach used visual metaphors or age-appropriate language, name and praise them specifically
+6. If the coach used language or tactics inappropriate for this age, name the specific instance
+7. The gradeLabel should describe THIS session specifically, not a generic description
+
+Respond ONLY with valid JSON — no preamble, no backticks, no markdown:
 {
   "grade": "A|B|C|D",
-  "gradeLabel": "specific one-line description of this session",
-  "encouragement": "2-3 warm, specific sentences. Name what this coach did well using framework language. Reference actual behaviours observed. Be genuine, not generic.",
-  "gameMoment": "Which of the four game moments did this session focus on, or should have focused on?",
-  "objectiveAlignment": "One sentence on whether the coaching language connected to the stated session objective and the 5Ws framework.",
-  "licenseArea1": "One sentence feedback on planning — did their language suggest clear alignment with the age group learning plan and game moment?",
-  "licenseArea2": "One sentence feedback on organisation — ball rolling time, transitions, appropriate challenge.",
-  "licenseArea3": "One sentence feedback on coaching interactions — quality of reinforcement, demonstrations, and questioning.",
-  "focus1": "Title of first specific development area",
-  "focus2": "Title of second specific development area",
+  "gradeLabel": "specific one-line description of THIS session for THIS age group",
+  "encouragement": "2-3 warm specific sentences naming actual behaviours observed. Reference framework language. Be genuine — this coach submitted real work.",
+  "gameMoment": "Which game moment did this session focus on? Was it appropriate for the age group?",
+  "objectiveAlignment": "Did the coaching language connect to the session topic and the age group developmental priorities?",
+  "licenseArea1": "Planning feedback — specific to what was observed in the transcript and appropriate for ${ageGroup}",
+  "licenseArea2": "Organisation feedback — ball rolling time, transitions, player activity level",
+  "licenseArea3": "Coaching interactions — quality of reinforcement, questions, demonstrations, freeze moments — ALL judged against the ${ageGroup} standard",
+  "focus1": "First development area title — age-appropriate",
+  "focus2": "Second development area title — age-appropriate",
   "actions": [
     {
-      "area": "focus area 1 title",
-      "action": "One specific, immediate action this coach should take in their next session",
-      "tip": "One practical tip — specific to this age group",
-      "why": "Why this matters for player development at ${ageGroup||'this age group'} — use framework language"
+      "area": "focus area 1",
+      "action": "One specific, concrete thing to do differently in the very next session — appropriate for ${ageGroup}",
+      "tip": "One practical tip to make the action easier",
+      "why": "Why this matters specifically for ${ageGroup} player development"
     },
     {
-      "area": "focus area 2 title",
-      "action": "One specific, immediate action",
+      "area": "focus area 2",
+      "action": "One specific, concrete thing to do differently — appropriate for ${ageGroup}",
       "tip": "One practical tip",
-      "why": "Why this matters"
+      "why": "Why this matters for ${ageGroup}"
     }
   ],
-  "feedforward": "Written feedforward (280-340 words). Short plain sentences. Write directly to the coach as 'you'. Structure: (1) What you did well — be specific, name 2-3 things. (2) First development area — what you observed, what to try instead, one concrete example for next session. (3) Second development area — same format. (4) Three specific actions for your next session. (5) One closing sentence of genuine encouragement connected to their growth. No jargon. No bullet points in this field — write as flowing paragraphs."
+  "feedforward": "One forward-looking paragraph in the voice of Jamie McLeod: warm, expert, specific to this coach's session and this age group. Reference the COACHING PROCESS: Assess, Identify Goal and Objectives, Plan, Implement, Analyse and Reflect, Reassess. End with encouragement."
 }`;
   },
 };
 
-// ─── AUTH ─────────────────────────────────────────────────────────────────────
 const Auth={
   showSignup(){$('loginPage').style.display='none';$('signupPage').style.display='flex';},
   showLogin(){$('signupPage').style.display='none';$('loginPage').style.display='flex';},
