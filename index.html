@@ -720,29 +720,66 @@ Respond ONLY with valid JSON — no preamble, no backticks, no markdown:
 {
   "grade": "A|B|C|D",
   "gradeLabel": "specific one-line description of THIS session for THIS age group",
-  "encouragement": "2-3 warm specific sentences naming actual behaviours observed. Reference framework language. Be genuine — this coach submitted real work.",
-  "gameMoment": "Which game moment did this session focus on? Was it appropriate for the age group?",
-  "objectiveAlignment": "Did the coaching language connect to the session topic and the age group developmental priorities?",
-  "licenseArea1": "Planning feedback — specific to what was observed in the transcript and appropriate for ${ageGroup}",
-  "licenseArea2": "Organisation feedback — ball rolling time, transitions, player activity level",
-  "licenseArea3": "Coaching interactions — quality of reinforcement, questions, demonstrations, freeze moments — ALL judged against the ${ageGroup} standard",
-  "focus1": "First development area title — age-appropriate",
-  "focus2": "Second development area title — age-appropriate",
+  "encouragement": "2-3 warm specific sentences naming actual behaviours observed from the transcript. Be genuine and specific — not generic.",
+
+  "planning": {
+    "summary": "2-3 sentences on planning quality for this age group. Did the session connect to a clear game moment and developmental priority?",
+    "subpoints": [
+      "Game moment identified: [what was observed or not observed in transcript]",
+      "Main/Sub principle clarity: [what was observed]",
+      "Player actions aligned to topic: [what was observed]",
+      "Transition time between activities: [estimate based on transcript — was setup efficient or did play stop unnecessarily?]",
+      "Age-appropriate design: [did the structure match ${ageGroup} cognitive, physical, social, emotional needs?]"
+    ]
+  },
+
+  "organisation": {
+    "summary": "2-3 sentences on organisation quality. Focus on ball rolling time and player activity.",
+    "subpoints": [
+      "Ball rolling time: [was play maximised or were there long pauses?]",
+      "Activity transitions: [evidence from transcript of smooth or slow transitions]",
+      "Player activity level: [were all players active or were there lines/waiting?]",
+      "Challenge level: [was the difficulty appropriate for ${ageGroup}?]",
+      "Freeze moment timing: [how long were stoppages? Target for ${ageGroup}: ${n<=7?'No freezes expected':n<=8?'under 1 min':n<=10?'under 2 min':n<=12?'2-3 min':'3-4 min'}. How many freeze moments occurred and was ball rolling time between them sufficient?]"
+    ]
+  },
+
+  "coachingInteractions": {
+    "summary": "2-3 sentences on the quality of coaching interactions. What was the dominant style?",
+    "howWhen": [
+      {"item": "Observe and Adapt", "evidence": "Quote or paraphrase a moment from the transcript where the coach observed and adapted, OR state that no clear example was detected"},
+      {"item": "Positive Reinforcement", "evidence": "Quote or paraphrase a specific example from the transcript, OR state not observed"},
+      {"item": "Key Words / Player Actions connected to session topic", "evidence": "Example from transcript or not observed"},
+      {"item": "Questions — Guided to check for understanding and reflect", "evidence": "Quote a specific question from the transcript or note absence. Note whether questions were appropriate for ${ageGroup}"},
+      {"item": "Demonstrate — model with the ball", "evidence": "Example from transcript or not observed"},
+      {"item": "Directive Guidance — telling players what to do at appropriate moments", "evidence": "Example from transcript. Note whether the language and delivery was appropriate for ${ageGroup}"},
+      {"item": "Feedback — specific to player behaviour", "evidence": "Example from transcript or not observed"},
+      {"item": "In the flow — sideline coaching during play", "evidence": "Example from transcript or not observed"},
+      {"item": "Freeze Moment — Freeze, Question, Demo with ball, Rehearse, Restart", "evidence": "Describe what happened in the freeze moment(s) from the transcript. Was the full sequence followed? Were ALL players on the relevant team coached?"},
+      {"item": "Visual metaphors and age-appropriate language", "evidence": "Quote any metaphors or visual language used. If none, note this as a development area for ${ageGroup}"}
+    ]
+  },
+
+  "gameMoment": "Which game moment did this session address? Was it appropriate for ${ageGroup}?",
+  "objectiveAlignment": "One sentence on whether coaching language connected to the session topic.",
+
+  "focus1": "First development area title",
+  "focus2": "Second development area title",
   "actions": [
     {
-      "area": "focus area 1",
-      "action": "One specific, concrete thing to do differently in the very next session — appropriate for ${ageGroup}",
-      "tip": "One practical tip to make the action easier",
-      "why": "Why this matters specifically for ${ageGroup} player development"
+      "area": "focus area 1 title",
+      "action": "One specific concrete action for the very next session — appropriate for ${ageGroup}",
+      "tip": "One practical tip",
+      "why": "Why this matters for ${ageGroup} development"
     },
     {
-      "area": "focus area 2",
-      "action": "One specific, concrete thing to do differently — appropriate for ${ageGroup}",
+      "area": "focus area 2 title",
+      "action": "One specific concrete action — appropriate for ${ageGroup}",
       "tip": "One practical tip",
       "why": "Why this matters for ${ageGroup}"
     }
   ],
-  "feedforward": "One forward-looking paragraph in the voice of Jamie McLeod: warm, expert, specific to this coach's session and this age group. Reference the COACHING PROCESS: Assess, Identify Goal and Objectives, Plan, Implement, Analyse and Reflect, Reassess. End with encouragement."
+  "feedforward": "One paragraph in the voice of Jamie McLeod — warm, expert, specific to this session and ${ageGroup}. Reference: Assess, Identify Goal and Objectives, Plan, Implement, Analyse and Reflect, Reassess. End with genuine encouragement."
 }`;
   },
 };
@@ -1049,25 +1086,71 @@ const Sessions={
   },
 
   async transcribeAudio(file){
+    const z=$('nsZone');
+    const sizeMB=(file.size/1024/1024).toFixed(1);
+
+    // Check file size - Whisper limit is 25MB
+    if(file.size>24*1024*1024){
+      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>File too large ('+sizeMB+'MB)</strong><br>Whisper has a 25MB limit. Try trimming the audio to under 45 minutes, or split it into two uploads.<br><br>Or paste your transcript in the box below.</p>';
+      return null;
+    }
+
+    // Show size feedback
+    if(z)z.innerHTML='<div class="upload-icon">&#9203;</div><p><strong>Transcribing '+file.name+'</strong> ('+sizeMB+'MB)<br>This takes 20–60 seconds depending on length. Please wait…</p>';
+
     try{
       const formData=new FormData();
-      formData.append('file', file, file.name);
+      // Force filename extension so Whisper recognises the format
+      const ext=file.name.split('.').pop().toLowerCase();
+      const safeExts=['mp3','mp4','mpeg','mpga','m4a','wav','webm'];
+      const useName=safeExts.includes(ext)?file.name:file.name+'.m4a';
+      formData.append('file', file, useName);
       formData.append('model','whisper-1');
       formData.append('response_format','text');
+      formData.append('language','en');
+
       const resp=await fetch('https://api.openai.com/v1/audio/transcriptions',{
         method:'POST',
-        headers:{'Authorization':`Bearer ${OPENAI_KEY}`},
+        headers:{'Authorization':'Bearer '+OPENAI_KEY},
         body:formData
       });
+
       if(!resp.ok){
-        const err=await resp.text();
-        console.error('Whisper error:',resp.status,err);
+        const errText=await resp.text();
+        let errMsg='';
+        try{
+          const errJson=JSON.parse(errText);
+          errMsg=errJson.error?.message||errText;
+        }catch{errMsg=errText;}
+
+        console.error('Whisper error:',resp.status,errMsg);
+
+        // Show specific error to coach
+        let userMsg='Transcription failed.';
+        if(resp.status===401)userMsg='API key issue — please contact support.';
+        else if(resp.status===413)userMsg='File too large for Whisper (max 25MB). Please trim the audio.';
+        else if(resp.status===415)userMsg='Audio format not supported. Please use m4a, mp3, or wav.';
+        else if(resp.status===429)userMsg='Too many requests — please wait 30 seconds and try again.';
+        else userMsg='Whisper error ('+resp.status+'): '+errMsg.slice(0,120);
+
+        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>'+userMsg+'</strong><br><br>Paste your transcript manually in the box below, or try again.</p>';
         return null;
       }
+
       const text=await resp.text();
-      return text;
+      if(!text||text.trim().length<20){
+        if(z)z.innerHTML='<div class="upload-icon">&#9888;</div><p>Transcription returned empty or very short text. The audio may have been too quiet or contained no speech.<br><br>Paste your transcript manually below.</p>';
+        return null;
+      }
+      return text.trim();
+
     }catch(e){
-      console.error('Transcription error:',e);
+      console.error('Transcription network error:',e);
+      const isNetwork=e.message?.includes('fetch')||e.message?.includes('network')||e.message?.includes('CORS');
+      const msg=isNetwork
+        ?'Network error — this may be a CORS issue with direct OpenAI calls from the browser. Try using Safari on iPhone instead, or paste your transcript manually.'
+        :'Unexpected error: '+e.message;
+      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p>'+msg+'<br><br>Paste your transcript in the box below.</p>';
       return null;
     }
   },
@@ -1103,6 +1186,9 @@ const Sessions={
       focus_area_1:aiResult.focus1||'',focus_area_2:aiResult.focus2||'',
       ai_feedforward:aiResult.feedforward||'',
       actions:JSON.stringify(aiResult.actions||[]),
+      planning:aiResult.planning?JSON.stringify(aiResult.planning):'',
+      organisation:aiResult.organisation?JSON.stringify(aiResult.organisation):'',
+      coaching_interactions:aiResult.coachingInteractions?JSON.stringify(aiResult.coachingInteractions):'',
     }).select().single();
     if(error){alert('Error saving: '+error.message);$('ns-processing').style.display='none';return;}
     State.sessions.unshift(session);
@@ -1201,6 +1287,7 @@ const Sessions={
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="grade ${Sessions.gc(s.grade)}" style="width:40px;height:40px;font-size:17px">${s.grade||'—'}</div>
+        <button class="btn btn-primary btn-sm" onclick="Sessions.toggleFullReport('${esc(id)}')">Full Report</button>
         <button class="btn btn-dark btn-sm" onclick="Sessions.exportFF('${esc(id)}')">Export</button>
         <button class="btn btn-sm" onclick="Nav.go('sessions','list')">← Back</button>
       </div>
@@ -1263,6 +1350,10 @@ const Sessions={
         </div>`).join('')}
       </div>`:''}
 
+      <div id="fullReport-${esc(id)}" style="display:none;margin-bottom:12px">
+        ${Sessions.buildFullReport(s)}
+      </div>
+
       <div class="card" style="margin-bottom:12px">
         <div class="card-title">Session Reflection</div>
         <div class="form-group"><label class="label">What went well in this session?</label><textarea id="rw" class="input" style="min-height:70px">${s.reflection_well||''}</textarea></div>
@@ -1284,7 +1375,66 @@ const Sessions={
     setTimeout(()=>Sessions.drawCharts(s),80);
   },
 
-  drawCharts(s){
+  toggleFullReport(id){
+    const el=document.getElementById('fullReport-'+id);
+    if(!el)return;
+    const btn=event.target;
+    if(el.style.display==='none'){
+      el.style.display='block';
+      btn.textContent='Hide Report';
+      el.scrollIntoView({behavior:'smooth',block:'start'});
+    } else {
+      el.style.display='none';
+      btn.textContent='Full Report';
+    }
+  },
+
+  buildFullReport(s){
+    const planning=s.planning?JSON.parse(s.planning):{};
+    const org=s.organisation?JSON.parse(s.organisation):{};
+    const ci=s.coaching_interactions?JSON.parse(s.coaching_interactions):{};
+    const n=ageNum(s.age_group||'U10');
+    const freezeTarget=n<=7?'Not expected at this age':n<=8?'Under 1 minute':n<=10?'Under 2 minutes':n<=12?'2–3 minutes':'3–4 minutes';
+
+    if(!planning.summary&&!org.summary&&!ci.summary){
+      return '<div class="card"><div class="card-title">Full Report</div><div style="color:var(--text-muted);font-size:13px;padding:12px 0">Full report not available for this session. Re-upload to generate a detailed breakdown.</div></div>';
+    }
+
+    const section=(title,color,summary,points)=>{
+      const pts=Array.isArray(points)?points:[];
+      return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+color+'">'
+        +'<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:'+color+';margin-bottom:8px">'+title+'</div>'
+        +(summary?'<div style="font-size:13px;line-height:1.7;color:var(--text);margin-bottom:10px">'+summary+'</div>':'')
+        +(pts.length?'<ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-muted);line-height:1.8">'
+          +pts.map(p=>'<li style="margin-bottom:4px">'+p+'</li>').join('')
+          +'</ul>':'')
+        +'</div>';
+    };
+
+    const howWhen=Array.isArray(ci.howWhen)?ci.howWhen:[];
+    const hwHtml=howWhen.length?'<div class="card" style="margin-bottom:10px;border-left:3px solid #3b82f6">'
+      +'<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#3b82f6;margin-bottom:8px">Coaching Interactions — HOW &amp; WHEN Checklist</div>'
+      +(ci.summary?'<div style="font-size:13px;line-height:1.7;color:var(--text);margin-bottom:12px">'+ci.summary+'</div>':'')
+      +howWhen.map(hw=>'<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">'
+        +'<div style="font-size:12px;font-weight:600;color:var(--dark);margin-bottom:3px">'+hw.item+'</div>'
+        +'<div style="font-size:12px;color:var(--text-muted);line-height:1.6;font-style:italic">'+hw.evidence+'</div>'
+        +'</div>').join('')
+      +'</div>':'';
+
+    return '<div>'
+      +'<div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--lime)">Full Session Report — '+s.age_group+' · '+s.title+'</div>'
+      +'<div style="background:var(--dark);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--lime-muted)">Freeze moment target for '+s.age_group+': <strong style="color:var(--lime)">'+freezeTarget+'</strong></div>'
+      +section('Planning','#84cc16',planning.summary,planning.subpoints)
+      +section('Organisation','#f59e0b',org.summary,org.subpoints)
+      +hwHtml
+      +(s.ai_feedforward?'<div class="card" style="border-left:3px solid var(--lime)">'
+        +'<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--lime);margin-bottom:8px">Written Feedforward — Jamie McLeod</div>'
+        +'<div style="font-size:13px;line-height:1.8;color:var(--text)">'+s.ai_feedforward.replace(/\n/g,'<br>')+'</div>'
+        +'</div>':'')
+      +'</div>';
+  },
+
+    drawCharts(s){
     const opts={responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:8,boxWidth:9}}}};
     const make=(id,type,data,options)=>{const el=$(id);if(!el)return;const c=new Chart(el,{type,data,options});State.activeCharts.push(c);};
     make('cQ','pie',{labels:['High-Order','Low-Order'],datasets:[{data:[s.high_order_q||0,s.low_order_q||0],backgroundColor:['#84cc16','#166534'],borderWidth:0}]},opts);
