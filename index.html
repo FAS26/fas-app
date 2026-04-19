@@ -1271,7 +1271,7 @@ const Sessions={
       const prompt=Framework.buildAIPrompt(transcript,title,ag,metrics,isGameDay);
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY},
+        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:prompt}]})
       });
       if(!resp.ok)return Sessions.basicFeedback(metrics,ag);
@@ -2369,7 +2369,7 @@ Write a reflection. Share it with someone who will challenge you.`},
     try{
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY},
+        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,messages:[{role:'user',content:p}]})
       });
       const body=resp.ok?(await resp.json()).content[0].text.trim():Team.fallbackEmail(isGame,training,games,schedule,extraContext,name);
@@ -2787,7 +2787,7 @@ Write a reflection. Share it with someone who will challenge you.`},
     try{
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY},
+        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,messages:[{role:'user',content:p}]})
       });
       const body=resp.ok?(await resp.json()).content[0].text.trim():Team.fallbackEmail(isGame,[],[],schedule,'',name);
