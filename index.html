@@ -1063,25 +1063,43 @@ const Sessions={
     const file=input.files[0];if(!file)return;
     const z=$('nsZone');
     const flag=$('ns-transcribing');
+    const sizeMB=(file.size/1024/1024).toFixed(1);
+
     if(file.name.match(/\.txt$/i)){
       const r=new FileReader();
       r.onload=e=>{const el=$('ns-transcript');if(el)el.value=e.target.result;};
       r.readAsText(file);
-      if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> ready — click Analyse below.</p>`;
-    } else if(file.name.match(/\.(mp3|m4a|wav|mp4|m4v|webm|ogg|aac|caf)$/i)){
+      if(z)z.innerHTML='<div class="upload-icon">&#10003;</div><p><strong>'+file.name+'</strong> ready — click Analyse Session below.</p>';
+
+    } else if(file.name.match(/\.(mp3|m4a|wav|mp4|m4v|webm|ogg|aac|caf|aiff|aif|flac)$/i)){
+      // Check size before attempting
+      if(file.size>24*1024*1024){
+        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>File too large ('+sizeMB+'MB)</strong><br>Whisper has a 25MB limit. Try trimming the session to under 45 minutes, or paste transcript manually below.</p>';
+        return;
+      }
       if(flag)flag.value='true';
-      if(z)z.innerHTML=`<div class="upload-icon">⏳</div><p><strong>Transcribing audio…</strong><br>This takes about 20-40 seconds. Please wait — the Analyse button will activate when done.</p>`;
+      if(z)z.innerHTML='<div class="upload-icon">&#8987;</div><p><strong>Transcribing '+file.name+'</strong> ('+sizeMB+'MB)…<br>This takes 20–60 seconds. Please wait.</p>';
+      // transcribeAudio handles ALL error display itself - don't overwrite on failure
       Sessions.transcribeAudio(file).then(transcript=>{
         if(flag)flag.value='false';
         if(transcript){
           const el=$('ns-transcript');if(el)el.value=transcript;
-          if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> transcribed ✓<br>Review the text below then click Analyse Session.</p>`;
-        } else {
-          if(z)z.innerHTML=`<div class="upload-icon">❌</div><p>Transcription failed. Please paste your transcript in the box below manually.</p>`;
+          if(z)z.innerHTML='<div class="upload-icon">&#10003;</div><p><strong>'+file.name+'</strong> transcribed successfully ✓<br>Review the text below, then click Analyse Session.</p>';
+        }
+        // If transcript is null, transcribeAudio already updated nsZone with the specific error
+      });
+
+    } else {
+      // Unknown format - still try as audio
+      if(flag)flag.value='true';
+      if(z)z.innerHTML='<div class="upload-icon">&#8987;</div><p><strong>'+file.name+'</strong> ('+sizeMB+'MB) — attempting transcription…</p>';
+      Sessions.transcribeAudio(file).then(transcript=>{
+        if(flag)flag.value='false';
+        if(transcript){
+          const el=$('ns-transcript');if(el)el.value=transcript;
+          if(z)z.innerHTML='<div class="upload-icon">&#10003;</div><p><strong>'+file.name+'</strong> transcribed ✓<br>Review below then click Analyse Session.</p>';
         }
       });
-    } else {
-      if(z)z.innerHTML=`<div class="upload-icon">✅</div><p><strong>${file.name}</strong> selected</p>`;
     }
   },
 
