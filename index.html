@@ -2128,8 +2128,10 @@ Write a reflection. Share it with someone who will challenge you.`},
           +'<div id="et-form-'+wk+'">'
             +Team.emailHintsStatic(wk,isGame,e)
           +'</div>'
-          +'<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+          +'<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">'
             +'<button class="btn btn-primary btn-sm" onclick="Team.generateEmailAI('+wk+')">✨ Generate from Sessions</button>'
+            +'<button class="btn btn-sm" onclick="Team.createOwnEmail('+wk+')">✏️ Create Own</button>'
+            +'<button class="btn btn-sm btn-dark" onclick="Team.writeMyOwn('+wk+')">🖊 Write My Own</button>'
             +'<button class="btn btn-sm" onclick="Team.markSent('+wk+')">'+sentBtn+'</button>'
           +'</div>'
           +'<div id="ep-'+wk+'" style="display:'+bodyDisplay+';margin-top:14px">'
@@ -2655,6 +2657,148 @@ Write a reflection. Share it with someone who will challenge you.`},
     await sb.from('settings').upsert({user_id:State.user.id,key:'seasonStartDate',value:date},{onConflict:'user_id,key'});
     Team.renderRoadmap();
   },
+
+  async createOwnEmail(wk){
+    // Show the prompts form and then generate AI email from coach's answers
+    const isGame=(State.weeklyEmails[wk]?.email_type==='pregame');
+    const e=State.weeklyEmails[wk]||{};
+    const formEl=document.getElementById('et-form-'+wk);
+    if(!formEl)return;
+
+    // Show a more focused prompt form for Create Own mode
+    const n=ageNum(State.profile?.age_group||'U10');
+    const ageGroup=State.profile?.age_group||'';
+    const vals=State.values.length?State.values.join(', '):'';
+
+    const promptForm=isGame
+      ? '<div style="background:var(--lime-pale);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px">'
+          +'<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.4px">✏️ Create Your Pre-Game Email — fill in what you know</div>'
+          +'<div class="form-group"><label class="label">What is the team focusing on in this game?</label>'
+            +'<textarea id="co-focus-'+wk+'" class="input" style="min-height:65px" placeholder="e.g. We are working on pressing high as a unit and using width in attack. What should parents look for?"></textarea></div>'
+          +'<div class="form-group"><label class="label">How has training gone this week?</label>'
+            +'<textarea id="co-training-'+wk+'" class="input" style="min-height:55px" placeholder="e.g. Great energy this week. Players have been sharp and the press has been really clicking."></textarea></div>'
+          +'<div class="form-group"><label class="label">What do you want parents to do on the sideline?</label>'
+            +'<textarea id="co-parents-'+wk+'" class="input" style="min-height:50px" placeholder="e.g. Encourage without directing. Let them work it out on the field. Cheer effort."></textarea></div>'
+          +'<div class="form-group"><label class="label">Match details</label>'
+            +'<input type="text" id="co-schedule-'+wk+'" class="input" placeholder="e.g. Saturday 11am at Riverside Park, Field 3. Home kit."></div>'
+          +'<button class="btn btn-primary" onclick="Team.generateFromPrompts('+wk+',true)">✨ Generate Email from My Notes</button>'
+        +'</div>'
+      : '<div style="background:var(--lime-pale);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px">'
+          +'<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.4px">✏️ Create Your Monday Email — fill in what you know</div>'
+          +'<div class="form-group"><label class="label">How did the game go on Saturday?</label>'
+            +'<textarea id="co-game-'+wk+'" class="input" style="min-height:70px" placeholder="e.g. We created good chances in the first half and defended well as a unit. Second half we lost our shape a bit — that is the work in progress and it is fine."></textarea></div>'
+          +'<div class="form-group"><label class="label">What is the team working on this week?</label>'
+            +'<textarea id="co-topic-'+wk+'" class="input" style="min-height:70px" placeholder="e.g. This week we are focused on combining in the middle third — quick passes and movement to create space in behind."></textarea></div>'
+          +'<div class="form-group"><label class="label">What moment stood out — player or team?</label>'
+            +'<textarea id="co-moment-'+wk+'" class="input" style="min-height:55px" placeholder="e.g. Bradley made three overlapping runs and showed real commitment to the game plan. Specific moments like that are what we build on."></textarea></div>'
+          +'<div class="form-group"><label class="label">What can parents ask their child this week?</label>'
+            +'<textarea id="co-reinforce-'+wk+'" class="input" style="min-height:50px" placeholder="e.g. Ask them what they worked on and let them explain it. Ask what was hard and what they would try differently."></textarea></div>'
+          +'<div class="form-group"><label class="label">Schedule / logistics</label>'
+            +'<input type="text" id="co-schedule-'+wk+'" class="input" placeholder="e.g. Training Mon 6pm + Wed 6pm · Game Saturday 10am at home"></div>'
+          +'<button class="btn btn-primary" onclick="Team.generateFromPrompts('+wk+',false)">✨ Generate Email from My Notes</button>'
+        +'</div>';
+
+    formEl.innerHTML=promptForm;
+    const ep=document.getElementById('ep-'+wk);
+    if(ep)ep.style.display='none';
+  },
+
+  writeMyOwn(wk){
+    // Turn off AI — give coach a blank editable box
+    const ep=document.getElementById('ep-'+wk);
+    const eb=document.getElementById('et-body-'+wk);
+    const e=State.weeklyEmails[wk]||{};
+    if(ep)ep.style.display='block';
+    if(eb){
+      eb.value=e.body||'Hi everyone,\n\n\n\nThank you for all that you do!\n\n'+coachName();
+      eb.style.opacity='1';
+      eb.focus();
+      // Move cursor to middle
+      const pos=eb.value.indexOf('\n\n\n')+2;
+      eb.setSelectionRange(pos,pos);
+    }
+    // Update the form area to show a note
+    const formEl=document.getElementById('et-form-'+wk);
+    if(formEl)formEl.innerHTML='<div class="alert alert-info" style="margin-bottom:0">'
+      +'<strong>Writing your own email.</strong> Type directly in the box below — no AI involved. '
+      +'Click <strong>Mark as Sent</strong> when done, or switch back to AI generation anytime.'
+      +'</div>';
+  },
+
+  async generateFromPrompts(wk,isGame){
+    const ep=document.getElementById('ep-'+wk);
+    const eb=document.getElementById('et-body-'+wk);
+    if(ep)ep.style.display='block';
+    if(eb){eb.value='Generating your email…';eb.style.opacity='0.5';}
+
+    const gameSummary=(document.getElementById('co-game-'+wk)?.value||'').trim();
+    const topicSummary=(document.getElementById('co-topic-'+wk)?.value||'').trim();
+    const moment=(document.getElementById('co-moment-'+wk)?.value||'').trim();
+    const reinforce=(document.getElementById('co-reinforce-'+wk)?.value||'').trim();
+    const focus=(document.getElementById('co-focus-'+wk)?.value||'').trim();
+    const training=(document.getElementById('co-training-'+wk)?.value||'').trim();
+    const parents=(document.getElementById('co-parents-'+wk)?.value||'').trim();
+    const schedule=(document.getElementById('co-schedule-'+wk)?.value||'').trim();
+
+    const name=coachName();
+    const ageGroup=State.profile?.age_group||'';
+    const vals=State.values.length?State.values.join(', '):'';
+    const ctx=Framework.getAgeContext(ageGroup);
+    const prevBodies=Object.values(State.weeklyEmails).filter(e=>e.body&&e.week<wk).slice(-3).map(e=>e.body);
+    const styleSample=prevBodies.join(' | ').slice(0,500);
+
+    const nl='\n';
+    let p='You are writing a parent email for '+name+', a youth football/soccer coach.'+nl+nl;
+    p+='AGE GROUP: '+ageGroup+' | DEVELOPMENTAL STAGE: '+ctx.dev+nl+nl;
+    p+='EMAIL TYPE: '+(isGame?'Pre-Game email':'Monday email')+nl+nl;
+    if(!isGame){
+      if(gameSummary)p+='COACH NOTES ON THE GAME: '+gameSummary+nl+nl;
+      if(topicSummary)p+='WHAT THE TEAM IS WORKING ON: '+topicSummary+nl+nl;
+      if(moment)p+='MOMENT TO HIGHLIGHT: '+moment+nl+nl;
+      if(reinforce)p+='WHAT PARENTS CAN REINFORCE: '+reinforce+nl+nl;
+    } else {
+      if(focus)p+='GAME FOCUS: '+focus+nl+nl;
+      if(training)p+='TRAINING THIS WEEK: '+training+nl+nl;
+      if(parents)p+='SIDELINE GUIDANCE: '+parents+nl+nl;
+    }
+    if(schedule)p+='LOGISTICS: '+schedule+nl+nl;
+    if(vals)p+='TEAM VALUES: '+vals+nl+nl;
+    if(styleSample)p+='MATCH THIS WRITING STYLE:'+nl+styleSample+nl+nl;
+    p+='AGE COACHING CONTEXT:'+nl+ctx.coaching.slice(0,400)+nl+nl;
+    p+='INSTRUCTIONS:'+nl;
+    p+='1. EXPAND the coach notes into a warm flowing email - do not just repeat their words'+nl;
+    p+='2. Use developmental and age-appropriate language for '+ageGroup+' parents'+nl;
+    p+='3. Flowing paragraphs only - NO headers, NO bullets'+nl;
+    p+='4. Development-focused - frame everything as growth not results'+nl;
+    p+='5. Normalise mistakes - they are part of the process'+nl;
+    if(!isGame){
+      p+='6. Weave in 2-3 conversation starter questions parents can ask their child'+nl;
+      p+='7. Reference team values naturally if provided'+nl;
+    } else {
+      p+='6. Help parents understand what to look for on match day'+nl;
+      p+='7. Remind parents to encourage without directing'+nl;
+    }
+    p+='8. Start with: Hi everyone,'+nl;
+    p+='9. End with: Thank you for all that you do! then new line: '+name+nl;
+    p+='10. Keep to 3-4 paragraphs'+nl;
+    p+='11. Write ONLY the email text - no commentary';
+
+    try{
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,messages:[{role:'user',content:p}]})
+      });
+      const body=resp.ok?(await resp.json()).content[0].text.trim():Team.fallbackEmail(isGame,[],[],schedule,'',name);
+      if(eb){eb.value=body;eb.style.opacity='1';}
+      State.weeklyEmails[wk]={...State.weeklyEmails[wk],body,email_type:isGame?'pregame':'monday'};
+      await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,body,email_type:isGame?'pregame':'monday'},{onConflict:'user_id,week'});
+    }catch(err){
+      const body=Team.fallbackEmail(isGame,[],[],schedule,'',name);
+      if(eb){eb.value=body;eb.style.opacity='1';}
+    }
+  },
+
 
   async markSent(wk){
     State.weeklyEmails[wk]={...State.weeklyEmails[wk],sent:true};
