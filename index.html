@@ -1073,8 +1073,8 @@ const Sessions={
 
     } else if(file.name.match(/\.(mp3|m4a|wav|mp4|m4v|webm|ogg|aac|caf|aiff|aif|flac)$/i)){
       // Check size before attempting
-      if(file.size>24*1024*1024){
-        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>File too large ('+sizeMB+'MB)</strong><br>Whisper has a 25MB limit. Try trimming the session to under 45 minutes, or paste transcript manually below.</p>';
+      if(file.size>95*1024*1024){
+        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>File too large ('+sizeMB+'MB)</strong><br>Maximum supported size is 95MB. Try trimming the session to under 45 minutes, or paste transcript manually below.</p>';
         return;
       }
       if(flag)flag.value='true';
@@ -1107,71 +1107,98 @@ const Sessions={
     const z=$('nsZone');
     const sizeMB=(file.size/1024/1024).toFixed(1);
 
-    // Check file size - Whisper limit is 25MB
-    if(file.size>24*1024*1024){
-      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>File too large ('+sizeMB+'MB)</strong><br>Whisper has a 25MB limit. Try trimming the audio to under 45 minutes, or split it into two uploads.<br><br>Or paste your transcript in the box below.</p>';
+    // Claude accepts audio up to 100MB natively - no size limit issue
+    if(file.size>95*1024*1024){
+      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>File too large ('+sizeMB+'MB)</strong><br>Maximum supported size is 95MB. Try trimming the session or splitting into two uploads.</p>';
       return null;
     }
 
-    // Show size feedback
-    if(z)z.innerHTML='<div class="upload-icon">&#9203;</div><p><strong>Transcribing '+file.name+'</strong> ('+sizeMB+'MB)<br>This takes 20–60 seconds depending on length. Please wait…</p>';
+    if(z)z.innerHTML='<div class="upload-icon">&#8987;</div><p><strong>Transcribing '+file.name+'</strong> ('+sizeMB+'MB)…<br>Reading your audio — this takes 20–60 seconds. Please wait.</p>';
 
     try{
-      const formData=new FormData();
-      // Force filename extension so Whisper recognises the format
-      const ext=file.name.split('.').pop().toLowerCase();
-      const safeExts=['mp3','mp4','mpeg','mpga','m4a','wav','webm'];
-      const useName=safeExts.includes(ext)?file.name:file.name+'.m4a';
-      formData.append('file', file, useName);
-      formData.append('model','whisper-1');
-      formData.append('response_format','text');
-      formData.append('language','en');
+      // Convert file to base64
+      const base64=await new Promise((resolve,reject)=>{
+        const reader=new FileReader();
+        reader.onload=()=>resolve(reader.result.split(',')[1]);
+        reader.onerror=()=>reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
 
-      const resp=await fetch('https://api.openai.com/v1/audio/transcriptions',{
+      // Determine media type
+      const ext=file.name.split('.').pop().toLowerCase();
+      const mimeMap={mp3:'audio/mpeg',mp4:'audio/mp4',m4a:'audio/mp4',wav:'audio/wav',
+        webm:'audio/webm',ogg:'audio/ogg',aac:'audio/aac',caf:'audio/x-caf',
+        aiff:'audio/aiff',aif:'audio/aiff',flac:'audio/flac',mpeg:'audio/mpeg',mpga:'audio/mpeg'};
+      const mediaType=mimeMap[ext]||'audio/mp4';
+
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Authorization':'Bearer '+OPENAI_KEY},
-        body:formData
+        headers:{
+          'Content-Type':'application/json',
+          'anthropic-version':'2023-06-01',
+          'x-api-key':ANTHROPIC_KEY
+        },
+        body:JSON.stringify({
+          model:'claude-sonnet-4-20250514',
+          max_tokens:8000,
+          messages:[{
+            role:'user',
+            content:[
+              {
+                type:'document',
+                source:{
+                  type:'base64',
+                  media_type:mediaType,
+                  data:base64
+                }
+              },
+              {
+                type:'text',
+                text:'Please transcribe this audio recording exactly as spoken. Include all words, pauses indicated by [...], and any notable vocal cues. Output ONLY the raw transcript text with no commentary, no timestamps, no labels. Just the words spoken.'
+              }
+            ]
+          }]
+        })
       });
 
       if(!resp.ok){
         const errText=await resp.text();
         let errMsg='';
-        try{
-          const errJson=JSON.parse(errText);
-          errMsg=errJson.error?.message||errText;
-        }catch{errMsg=errText;}
+        try{const j=JSON.parse(errText);errMsg=j.error?.message||errText;}
+        catch{errMsg=errText;}
+        console.error('Transcription error:',resp.status,errMsg);
 
-        console.error('Whisper error:',resp.status,errMsg);
-
-        // Show specific error to coach
-        let userMsg='Transcription failed.';
-        if(resp.status===401)userMsg='API key issue — please contact support.';
-        else if(resp.status===413)userMsg='File too large for Whisper (max 25MB). Please trim the audio.';
-        else if(resp.status===415)userMsg='Audio format not supported. Please use m4a, mp3, or wav.';
+        let userMsg='Transcription failed ('+resp.status+').';
+        if(resp.status===401)userMsg='API authentication error — please contact support.';
+        else if(resp.status===413||errMsg.includes('too large'))userMsg='File too large for transcription. Try trimming to under 30 minutes.';
         else if(resp.status===429)userMsg='Too many requests — please wait 30 seconds and try again.';
-        else userMsg='Whisper error ('+resp.status+'): '+errMsg.slice(0,120);
+        else if(errMsg.includes('audio')||errMsg.includes('media'))userMsg='Audio format not supported ('+ext+'). Try saving as m4a or mp3.';
+        else userMsg='Error: '+errMsg.slice(0,150);
 
-        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>'+userMsg+'</strong><br><br>Paste your transcript manually in the box below, or try again.</p>';
+        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>'+userMsg+'</strong><br><br>You can paste your transcript manually in the box below instead.</p>';
         return null;
       }
 
-      const text=await resp.text();
-      if(!text||text.trim().length<20){
-        if(z)z.innerHTML='<div class="upload-icon">&#9888;</div><p>Transcription returned empty or very short text. The audio may have been too quiet or contained no speech.<br><br>Paste your transcript manually below.</p>';
+      const data=await resp.json();
+      const transcript=data.content?.[0]?.text?.trim()||'';
+
+      if(!transcript||transcript.length<20){
+        if(z)z.innerHTML='<div class="upload-icon">&#9888;</div><p>Transcription returned no text. The audio may be too quiet or contain no speech.<br><br>Paste your transcript manually below.</p>';
         return null;
       }
-      return text.trim();
+
+      return transcript;
 
     }catch(e){
-      console.error('Transcription network error:',e);
-      const isNetwork=e.message?.includes('fetch')||e.message?.includes('network')||e.message?.includes('CORS');
-      const msg=isNetwork
-        ?'Network error — this may be a CORS issue with direct OpenAI calls from the browser. Try using Safari on iPhone instead, or paste your transcript manually.'
+      console.error('Transcription exception:',e);
+      const msg=e.message?.includes('fetch')||e.message?.includes('network')
+        ?'Network error connecting to the transcription service. Check your internet connection and try again.'
         :'Unexpected error: '+e.message;
-      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p>'+msg+'<br><br>Paste your transcript in the box below.</p>';
+      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p>'+msg+'<br><br>Paste your transcript manually in the box below.</p>';
       return null;
     }
   },
+
 
   handleDrop(e){
     e.preventDefault();
