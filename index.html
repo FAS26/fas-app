@@ -2377,8 +2377,9 @@ Write a reflection. Share it with someone who will challenge you.`},
       State.weeklyEmails[wk]={...State.weeklyEmails[wk],body,email_type:isGame?'pregame':'monday',schedule,spotlight};
       await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,body,email_type:isGame?'pregame':'monday',schedule,spotlight},{onConflict:'user_id,week'});
     }catch(err){
+      console.error('Email generation error:',err);
       const body=Team.fallbackEmail(isGame,training,games,schedule,extraContext,name);
-      if(eb){eb.value=body;eb.style.opacity='1';}
+      if(eb){eb.value=body||('Error generating email: '+err.message+'. Please try again or use Create Own.');eb.style.opacity='1';}
     }
   },
 
@@ -2794,9 +2795,29 @@ Write a reflection. Share it with someone who will challenge you.`},
       State.weeklyEmails[wk]={...State.weeklyEmails[wk],body,email_type:isGame?'pregame':'monday'};
       await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,body,email_type:isGame?'pregame':'monday'},{onConflict:'user_id,week'});
     }catch(err){
-      const body=Team.fallbackEmail(isGame,[],[],schedule,'',name);
-      if(eb){eb.value=body;eb.style.opacity='1';}
+      console.error('generateFromPrompts error:',err);
+      if(eb){eb.value='Could not generate email: '+err.message+'. Try again or use Write My Own.';eb.style.opacity='1';}
     }
+  },
+
+
+  fallbackEmail(isGame,training,games,schedule,context,name){
+    const nl='\n';
+    const game=Array.isArray(games)?games[0]:null;
+    const session=Array.isArray(training)?training[0]:null;
+    let b='Hi everyone,'+nl+nl;
+    if(isGame){
+      if(session)b+='This week in training we have been working on '+(session.focus_area_1||session.title||'our session goals')+'. The effort has been great and the players are developing well.'+nl+nl;
+      b+='I am really looking forward to watching the team compete'+(schedule?' — '+schedule:'')+'. As always there will be moments that go well and moments that are a work in progress — that is the nature of development.'+nl+nl;
+      b+='The best thing you can do on the sideline is encourage without directing. Let the players communicate their own ideas on the field.'+nl+nl;
+    } else {
+      if(game)b+=(game.encouragement||'It was great to watch the team on Saturday. They are developing well and it shows in how they are playing.')+nl+nl;
+      if(session)b+='This week we are going to focus on '+(session.focus_area_1||session.title||'continuing our development')+(session.focus_area_2?'. We will also be working on '+session.focus_area_2:'')+'.'+(context?' '+context:'')+nl+nl;
+      else if(context)b+=context+nl+nl;
+    }
+    if(schedule)b+='UPCOMING: '+schedule+nl+nl;
+    b+='Thank you for all that you do!'+nl+nl+name;
+    return b;
   },
 
 
