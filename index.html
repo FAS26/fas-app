@@ -1107,94 +1107,85 @@ const Sessions={
     const z=$('nsZone');
     const sizeMB=(file.size/1024/1024).toFixed(1);
 
-    // Claude accepts audio up to 100MB natively - no size limit issue
-    if(file.size>95*1024*1024){
-      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>File too large ('+sizeMB+'MB)</strong><br>Maximum supported size is 95MB. Try trimming the session or splitting into two uploads.</p>';
+    if(file.size>24*1024*1024){
+      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div>'
+        +'<p><strong>File too large ('+sizeMB+'MB)</strong><br>'
+        +'Whisper has a 25MB limit. Try one of these options:<br><br>'
+        +'<strong>Option 1:</strong> Trim the recording to under 45 minutes<br>'
+        +'<strong>Option 2:</strong> On iPhone, go to Settings → Voice Memos → Audio Quality → set to Compressed<br>'
+        +'<strong>Option 3:</strong> Paste the transcript manually in the box below</p>';
       return null;
     }
 
-    if(z)z.innerHTML='<div class="upload-icon">&#8987;</div><p><strong>Transcribing '+file.name+'</strong> ('+sizeMB+'MB)…<br>Reading your audio — this takes 20–60 seconds. Please wait.</p>';
+    if(z)z.innerHTML='<div class="upload-icon">&#8987;</div>'
+      +'<p><strong>Transcribing '+file.name+'</strong> ('+sizeMB+'MB)…<br>'
+      +'This takes 20–60 seconds. Please wait.</p>';
 
     try{
-      // Convert file to base64
-      const base64=await new Promise((resolve,reject)=>{
-        const reader=new FileReader();
-        reader.onload=()=>resolve(reader.result.split(',')[1]);
-        reader.onerror=()=>reject(new Error('Failed to read file'));
-        reader.readAsDataURL(file);
-      });
-
-      // Determine media type
+      const formData=new FormData();
       const ext=file.name.split('.').pop().toLowerCase();
-      const mimeMap={mp3:'audio/mpeg',mp4:'audio/mp4',m4a:'audio/mp4',wav:'audio/wav',
-        webm:'audio/webm',ogg:'audio/ogg',aac:'audio/aac',caf:'audio/x-caf',
-        aiff:'audio/aiff',aif:'audio/aiff',flac:'audio/flac',mpeg:'audio/mpeg',mpga:'audio/mpeg'};
-      const mediaType=mimeMap[ext]||'audio/mp4';
+      // Whisper requires specific extensions - rename if needed
+      const validExts=['mp3','mp4','mpeg','mpga','m4a','wav','webm'];
+      const filename=validExts.includes(ext)?file.name:file.name.replace(/\.[^.]+$/,'.m4a');
+      formData.append('file', file, filename);
+      formData.append('model','whisper-1');
+      formData.append('response_format','text');
+      formData.append('language','en');
 
-      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      const resp=await fetch('https://api.openai.com/v1/audio/transcriptions',{
         method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'anthropic-version':'2023-06-01',
-          'x-api-key':ANTHROPIC_KEY
-        },
-        body:JSON.stringify({
-          model:'claude-sonnet-4-20250514',
-          max_tokens:8000,
-          messages:[{
-            role:'user',
-            content:[
-              {
-                type:'document',
-                source:{
-                  type:'base64',
-                  media_type:mediaType,
-                  data:base64
-                }
-              },
-              {
-                type:'text',
-                text:'Please transcribe this audio recording exactly as spoken. Include all words, pauses indicated by [...], and any notable vocal cues. Output ONLY the raw transcript text with no commentary, no timestamps, no labels. Just the words spoken.'
-              }
-            ]
-          }]
-        })
+        headers:{'Authorization':'Bearer '+OPENAI_KEY},
+        body:formData
       });
 
       if(!resp.ok){
         const errText=await resp.text();
         let errMsg='';
         try{const j=JSON.parse(errText);errMsg=j.error?.message||errText;}
-        catch{errMsg=errText;}
-        console.error('Transcription error:',resp.status,errMsg);
+        catch{errMsg=errText.slice(0,200);}
+        console.error('Whisper error:',resp.status,errMsg);
 
-        let userMsg='Transcription failed ('+resp.status+').';
-        if(resp.status===401)userMsg='API authentication error — please contact support.';
-        else if(resp.status===413||errMsg.includes('too large'))userMsg='File too large for transcription. Try trimming to under 30 minutes.';
+        let userMsg='';
+        if(resp.status===401)userMsg='OpenAI API key issue. Please contact support.';
+        else if(resp.status===413)userMsg='File too large. Try compressing or trimming the audio.';
         else if(resp.status===429)userMsg='Too many requests — please wait 30 seconds and try again.';
-        else if(errMsg.includes('audio')||errMsg.includes('media'))userMsg='Audio format not supported ('+ext+'). Try saving as m4a or mp3.';
-        else userMsg='Error: '+errMsg.slice(0,150);
+        else if(resp.status===415)userMsg='Format not supported. Rename the file to .m4a and try again.';
+        else userMsg='Whisper error ('+resp.status+'): '+errMsg;
 
-        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>'+userMsg+'</strong><br><br>You can paste your transcript manually in the box below instead.</p>';
+        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div>'
+          +'<p><strong>'+userMsg+'</strong><br><br>'
+          +'Paste your transcript manually in the box below.</p>';
         return null;
       }
 
-      const data=await resp.json();
-      const transcript=data.content?.[0]?.text?.trim()||'';
-
-      if(!transcript||transcript.length<20){
-        if(z)z.innerHTML='<div class="upload-icon">&#9888;</div><p>Transcription returned no text. The audio may be too quiet or contain no speech.<br><br>Paste your transcript manually below.</p>';
+      const text=await resp.text();
+      if(!text||text.trim().length<10){
+        if(z)z.innerHTML='<div class="upload-icon">&#9888;</div>'
+          +'<p>Transcription returned empty text. The audio may be too quiet.<br><br>'
+          +'Paste your transcript manually below.</p>';
         return null;
       }
-
-      return transcript;
+      return text.trim();
 
     }catch(e){
-      console.error('Transcription exception:',e);
-      const msg=e.message?.includes('fetch')||e.message?.includes('network')
-        ?'Network error connecting to the transcription service. Check your internet connection and try again.'
-        :'Unexpected error: '+e.message;
-      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p>'+msg+'<br><br>Paste your transcript manually in the box below.</p>';
+      console.error('Transcription error:',e.name, e.message);
+
+      // CORS or network failure - give specific instructions
+      const isCORS=e.message?.includes('CORS')||e.message?.includes('Failed to fetch')||e.name==='TypeError';
+
+      if(isCORS){
+        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div>'
+          +'<p><strong>Browser blocked the upload (CORS restriction).</strong><br><br>'
+          +'This happens on some browsers. Try one of these:<br><br>'
+          +'<strong>Option 1 — Use the iPhone app:</strong> Open FAS in Safari on iPhone, tap Share → Add to Home Screen, then upload from there.<br><br>'
+          +'<strong>Option 2 — Use Chrome on desktop:</strong> Chrome handles this more reliably than Firefox or Safari on Mac.<br><br>'
+          +'<strong>Option 3 — Paste transcript manually:</strong> Open your Voice Memo in a transcription app (like Otter.ai or Apple built-in transcription) and paste the text below.<br><br>'
+          +'<strong>Option 4 — Use Rev.com or Otter.ai</strong> for a quick free transcription, then paste below.</p>';
+      } else {
+        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div>'
+          +'<p><strong>Connection error: '+e.message+'</strong><br><br>'
+          +'Check your internet connection and try again, or paste your transcript manually below.</p>';
+      }
       return null;
     }
   },
@@ -3762,19 +3753,28 @@ filter(btn,cat){
 open(id){
   const g=Resources._guides.find(r=>r.id===id);
   if(!g)return;
-  const m=document.getElementById('addPlayerModal');
-  if(!m)return;
-  m.querySelector('.modal-content').innerHTML='<div class="modal-body" style="max-height:80vh;overflow-y:auto">'
-    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
-      +'<div style="font-size:32px">'+g.icon+'</div>'
-      +'<div><div style="font-size:16px;font-weight:700">'+g.title+'</div>'
-      +'<div style="font-size:11px;color:var(--lime-muted)">'+g.source+(g.url?' &middot; <a href="'+g.url+'" target="_blank" style="color:var(--lime)">Original article &#8599;</a>':'')+'</div></div>'
+  const el=document.getElementById('resourceModalContent');
+  if(!el)return;
+  el.innerHTML='<div style="padding:4px 0">'
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">'
+      +'<div style="display:flex;align-items:center;gap:12px">'
+        +'<div style="font-size:36px">'+g.icon+'</div>'
+        +'<div>'
+          +'<div style="font-size:17px;font-weight:700;color:var(--dark);margin-bottom:3px">'+g.title+'</div>'
+          +'<div style="font-size:11px;color:var(--text-muted)">'+g.source
+          +(g.url?' &nbsp;&middot;&nbsp; <a href="'+g.url+'" target="_blank" style="color:var(--lime);font-weight:600">Read original &#8599;</a>':'')
+          +'</div>'
+        +'</div>'
+      +'</div>'
+      +'<button onclick="closeModal(\'resourceModal\')" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-muted);line-height:1;padding:4px">&#215;</button>'
     +'</div>'
-    +'<div style="font-size:13px;line-height:1.8;white-space:pre-line;color:var(--text)">'+g.content+'</div>'
-    +'<button class="btn btn-primary" onclick="closeModal(\'addPlayerModal\')" style="margin-top:18px;width:100%">Close</button>'
+    +'<span class="badge badge-lime" style="margin-bottom:14px;display:inline-block">'+g.badge+'</span>'
+    +'<div style="font-size:13px;line-height:1.85;white-space:pre-line;color:var(--text);margin-top:4px">'+g.content+'</div>'
+    +'<button class="btn btn-primary" onclick="closeModal(\'resourceModal\')" style="margin-top:20px;width:100%">Close</button>'
     +'</div>';
-  openModal('addPlayerModal');
+  openModal('resourceModal');
 },
+
 
 _guides:[],
 };
@@ -3803,6 +3803,14 @@ if('serviceWorker' in navigator){
 }
 
 </script>
+
+
+<!-- RESOURCE MODAL -->
+<div class="modal-bg" id="resourceModal">
+  <div class="modal" style="max-width:620px;max-height:88vh;overflow-y:auto">
+    <div id="resourceModalContent"></div>
+  </div>
+</div>
 
 </body>
 </html>
