@@ -348,6 +348,7 @@ textarea.input{resize:vertical;min-height:80px;line-height:1.6;}
         <button id="directorViewBtn" onclick="App.switchView('director')" style="padding:5px 12px;border-radius:calc(var(--radius-xs) - 2px);border:none;background:transparent;color:var(--lime-muted);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">🏛️ Director</button>
       </div>
       <span class="topbar-user" id="topbarUser"></span>
+      <button class="topbar-btn" id="apiKeyBtn" onclick="App.manageKey()" style="display:none">🔑 API Key</button>
       <button class="topbar-btn" onclick="Auth.logout()">Sign out</button>
     </div>
   </div>
@@ -416,7 +417,18 @@ textarea.input{resize:vertical;min-height:80px;line-height:1.6;}
 // Version marker: FAS v2.1
 window.addEventListener('load',()=>console.log('FAS v2.1 - Team:',typeof Team,'Session:',typeof Sessions));
 const SB_URL='https://bbzxpeplwufkmaqswyks.supabase.co';
-const ANTHROPIC_KEY='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';
+// API key stored in browser localStorage — never in source code
+let ANTHROPIC_KEY=localStorage.getItem('fas_anthropic_key')||'';
+function getKey(){
+  if(ANTHROPIC_KEY)return ANTHROPIC_KEY;
+  const k=prompt('Enter your Anthropic API key to enable AI features:\n(Get one at console.anthropic.com → API Keys)\n\nThis is stored only in your browser, never uploaded anywhere.');
+  if(k&&k.startsWith('sk-ant')){
+    ANTHROPIC_KEY=k.trim();
+    localStorage.setItem('fas_anthropic_key',ANTHROPIC_KEY);
+    return ANTHROPIC_KEY;
+  }
+  return null;
+}
 const OPENAI_KEY='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';
 const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJienhwZXBsd3Vma21hcXN3eWtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NzMxOTMsImV4cCI6MjA4OTQ0OTE5M30.n9o9buBrpgjNALKC3LeZnbpSjzf-j47hxXp32Ft3WYM';
 const sb=supabase.createClient(SB_URL,SB_ANON);
@@ -870,11 +882,50 @@ const App={
 
     $('loadingState').style.display='none';
 
+    // Show API key button if key not set
+    const keyBtn=$('apiKeyBtn');
+    if(keyBtn)keyBtn.style.display='inline-flex';
+    if(!localStorage.getItem('fas_anthropic_key')){
+      // Show a non-blocking notice
+      setTimeout(()=>{
+        if(!localStorage.getItem('fas_anthropic_key')){
+          const notice=document.createElement('div');
+          notice.style.cssText='position:fixed;bottom:80px;right:16px;background:var(--dark);border:2px solid var(--lime);border-radius:12px;padding:14px 18px;max-width:300px;z-index:999;font-size:13px;color:var(--white);box-shadow:0 8px 24px rgba(0,0,0,0.3)';
+          notice.innerHTML='<div style="font-weight:700;color:var(--lime);margin-bottom:6px">🔑 API Key needed</div>'
+            +'<div style="color:#dcfce7;line-height:1.6;margin-bottom:10px">To use AI features (session analysis, email generation) add your Anthropic API key.</div>'
+            +'<button onclick="App.manageKey();this.parentElement.remove()" style="background:var(--lime);color:var(--dark-deep);border:none;border-radius:6px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:12px">Add Key →</button>'
+            +'<button onclick="this.parentElement.remove()" style="background:transparent;color:var(--lime-muted);border:none;cursor:pointer;font-size:12px;margin-left:8px">Later</button>';
+          document.body.appendChild(notice);
+        }
+      },2000);
+    }
+
     // Route to starting page
     if(isDirector&&!isCoach){
       Nav.go('director');
     } else {
       Nav.go('sessions');
+    }
+  },
+
+  manageKey(){
+    const current=localStorage.getItem('fas_anthropic_key')||'';
+    const msg=current
+      ?'Your API key is set (ends in ...'+current.slice(-6)+').\n\nEnter a new key to replace it, or leave blank and click OK to keep the current one:'
+      :'Enter your Anthropic API key:\n(Get one at console.anthropic.com → Settings → API Keys)\n\nThis is stored only in your browser — it never appears in any code or gets uploaded anywhere.';
+    const k=prompt(msg, current?'':'' );
+    if(k===null)return; // cancelled
+    if(k.trim()===''&&current){return;} // kept existing
+    if(k.trim().startsWith('sk-ant')){
+      ANTHROPIC_KEY=k.trim();
+      localStorage.setItem('fas_anthropic_key',ANTHROPIC_KEY);
+      alert('API key saved. AI features are now active.');
+    } else if(k.trim()==='clear'){
+      ANTHROPIC_KEY='';
+      localStorage.removeItem('fas_anthropic_key');
+      alert('API key cleared.');
+    } else if(k.trim()!==''){
+      alert('That does not look like a valid Anthropic API key (should start with sk-ant). Please try again.');
     }
   },
 
@@ -1271,7 +1322,7 @@ const Sessions={
       const prompt=Framework.buildAIPrompt(transcript,title,ag,metrics,isGameDay);
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'},
+        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':getKey(),'anthropic-dangerous-direct-browser-access':'true'},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:prompt}]})
       });
       if(!resp.ok)return Sessions.basicFeedback(metrics,ag);
@@ -2369,7 +2420,7 @@ Write a reflection. Share it with someone who will challenge you.`},
     try{
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'},
+        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':getKey(),'anthropic-dangerous-direct-browser-access':'true'},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,messages:[{role:'user',content:p}]})
       });
       const body=resp.ok?(await resp.json()).content[0].text.trim():Team.fallbackEmail(isGame,training,games,schedule,extraContext,name);
@@ -2792,7 +2843,7 @@ Write a reflection. Share it with someone who will challenge you.`},
         headers:{
           'Content-Type':'application/json',
           'anthropic-version':'2023-06-01',
-          'x-api-key':ANTHROPIC_KEY,
+          'x-api-key':getKey(),
           'anthropic-dangerous-direct-browser-access':'true'
         },
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,messages:[{role:'user',content:p}]})
