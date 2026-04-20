@@ -2746,57 +2746,89 @@ Write a reflection. Share it with someone who will challenge you.`},
     const vals=State.values.length?State.values.join(', '):'';
     const ctx=Framework.getAgeContext(ageGroup);
     const prevBodies=Object.values(State.weeklyEmails).filter(e=>e.body&&e.week<wk).slice(-3).map(e=>e.body);
-    const styleSample=prevBodies.join(' | ').slice(0,500);
+    const styleSample=prevBodies.join(' | ').slice(0,400);
 
     const nl='\n';
-    let p='You are writing a parent email for '+name+', a youth football/soccer coach.'+nl+nl;
-    p+='AGE GROUP: '+ageGroup+' | DEVELOPMENTAL STAGE: '+ctx.dev+nl+nl;
-    p+='EMAIL TYPE: '+(isGame?'Pre-Game email':'Monday email')+nl+nl;
+    let p='You are writing a parent email for a youth football/soccer coach named '+name+'.'+nl+nl;
+    p+='COACH AGE GROUP: '+ageGroup+' | DEVELOPMENTAL STAGE: '+ctx.dev+nl+nl;
+    p+='EMAIL TYPE: '+(isGame?'Pre-Game email (sent before match day)':'Monday email (start of training week)')+nl+nl;
+    p+='THE COACH HAS PROVIDED THESE NOTES - expand each into warm flowing paragraphs:'+nl+nl;
     if(!isGame){
-      if(gameSummary)p+='COACH NOTES ON THE GAME: '+gameSummary+nl+nl;
+      if(gameSummary)p+='HOW THE GAME WENT: '+gameSummary+nl+nl;
       if(topicSummary)p+='WHAT THE TEAM IS WORKING ON: '+topicSummary+nl+nl;
       if(moment)p+='MOMENT TO HIGHLIGHT: '+moment+nl+nl;
-      if(reinforce)p+='WHAT PARENTS CAN REINFORCE: '+reinforce+nl+nl;
+      if(reinforce)p+='PARENT QUESTIONS TO ASK: '+reinforce+nl+nl;
     } else {
-      if(focus)p+='GAME FOCUS: '+focus+nl+nl;
-      if(training)p+='TRAINING THIS WEEK: '+training+nl+nl;
+      if(focus)p+='GAME FOCUS FOR PARENTS: '+focus+nl+nl;
+      if(training)p+='HOW TRAINING HAS GONE: '+training+nl+nl;
       if(parents)p+='SIDELINE GUIDANCE: '+parents+nl+nl;
     }
     if(schedule)p+='LOGISTICS: '+schedule+nl+nl;
     if(vals)p+='TEAM VALUES: '+vals+nl+nl;
-    if(styleSample)p+='MATCH THIS WRITING STYLE:'+nl+styleSample+nl+nl;
-    p+='AGE COACHING CONTEXT:'+nl+ctx.coaching.slice(0,400)+nl+nl;
-    p+='INSTRUCTIONS:'+nl;
-    p+='1. EXPAND the coach notes into a warm flowing email - do not just repeat their words'+nl;
-    p+='2. Use developmental and age-appropriate language for '+ageGroup+' parents'+nl;
-    p+='3. Flowing paragraphs only - NO headers, NO bullets'+nl;
-    p+='4. Development-focused - frame everything as growth not results'+nl;
-    p+='5. Normalise mistakes - they are part of the process'+nl;
+    if(styleSample)p+='WRITE IN THIS STYLE (previous emails):'+nl+styleSample+nl+nl;
+    p+='AGE-SPECIFIC COACHING VOICE FOR '+ageGroup+':'+nl;
+    p+=ctx.coaching.slice(0,300)+nl+nl;
+    p+='RULES:'+nl;
+    p+='1. Expand the coach notes into full warm paragraphs - do not just repeat their words'+nl;
+    p+='2. Development-focused language appropriate for '+ageGroup+' parents'+nl;
+    p+='3. Flowing paragraphs only - NO headers, NO bullets, NO all-caps section titles'+nl;
+    p+='4. Normalise mistakes - they are part of growth'+nl;
     if(!isGame){
-      p+='6. Weave in 2-3 conversation starter questions parents can ask their child'+nl;
-      p+='7. Reference team values naturally if provided'+nl;
+      p+='5. Weave in the parent questions naturally as conversation starters'+nl;
+      p+='6. Reference team values if provided'+nl;
     } else {
-      p+='6. Help parents understand what to look for on match day'+nl;
-      p+='7. Remind parents to encourage without directing'+nl;
+      p+='5. Help parents watch intelligently - explain what to look for'+nl;
+      p+='6. Encourage without directing reminder'+nl;
     }
-    p+='8. Start with: Hi everyone,'+nl;
-    p+='9. End with: Thank you for all that you do! then new line: '+name+nl;
-    p+='10. Keep to 3-4 paragraphs'+nl;
-    p+='11. Write ONLY the email text - no commentary';
+    p+='7. Start: Hi everyone,'+nl;
+    p+='8. End: Thank you for all that you do! then new line with just: '+name+nl;
+    p+='9. Maximum 3-4 paragraphs'+nl;
+    p+='10. Write ONLY the email text - nothing else';
 
     try{
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'},
+        headers:{
+          'Content-Type':'application/json',
+          'anthropic-version':'2023-06-01',
+          'x-api-key':ANTHROPIC_KEY,
+          'anthropic-dangerous-direct-browser-access':'true'
+        },
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,messages:[{role:'user',content:p}]})
       });
-      const body=resp.ok?(await resp.json()).content[0].text.trim():Team.fallbackEmail(isGame,[],[],schedule,'',name);
+
+      if(!resp.ok){
+        const errText=await resp.text();
+        let errMsg='';
+        try{const j=JSON.parse(errText);errMsg=j.error?.message||errText;}
+        catch{errMsg=errText.slice(0,150);}
+        console.error('generateFromPrompts API error:',resp.status,errMsg);
+        // Show error but also show what we have
+        if(eb){
+          eb.value='API error ('+resp.status+'): '+errMsg+nl+nl+'Your notes were:'+nl+(gameSummary||focus||topicSummary||'');
+          eb.style.opacity='1';
+        }
+        return;
+      }
+
+      const data=await resp.json();
+      const body=data.content?.[0]?.text?.trim();
+      if(!body){
+        if(eb){eb.value='No response from AI. Please try again.';eb.style.opacity='1';}
+        return;
+      }
       if(eb){eb.value=body;eb.style.opacity='1';}
       State.weeklyEmails[wk]={...State.weeklyEmails[wk],body,email_type:isGame?'pregame':'monday'};
       await sb.from('weekly_emails').upsert({user_id:State.user.id,coach_name:coachName(),week:wk,body,email_type:isGame?'pregame':'monday'},{onConflict:'user_id,week'});
-    }catch(err){
-      console.error('generateFromPrompts error:',err);
-      if(eb){eb.value='Could not generate email: '+err.message+'. Try again or use Write My Own.';eb.style.opacity='1';}
+
+    }catch(e){
+      console.error('generateFromPrompts fetch error:',e.name,e.message);
+      // Show the actual error clearly
+      if(eb){
+        eb.value='Error: '+e.message+nl+nl
+          +'Your notes were saved. Try clicking Generate again, or copy your notes and use Write My Own.';
+        eb.style.opacity='1';
+      }
     }
   },
 
