@@ -416,7 +416,7 @@ textarea.input{resize:vertical;min-height:80px;line-height:1.6;}
 // Version marker: FAS v2.1
 window.addEventListener('load',()=>console.log('FAS v2.1 - Team:',typeof Team,'Session:',typeof Sessions));
 const SB_URL='https://bbzxpeplwufkmaqswyks.supabase.co';
-const ANTHROPIC_KEY='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';
+const ANTHROPIC_KEY='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';
 const OPENAI_KEY='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';
 const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJienhwZXBsd3Vma21hcXN3eWtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NzMxOTMsImV4cCI6MjA4OTQ0OTE5M30.n9o9buBrpgjNALKC3LeZnbpSjzf-j47hxXp32Ft3WYM';
 const sb=supabase.createClient(SB_URL,SB_ANON);
@@ -2785,6 +2785,7 @@ Write a reflection. Share it with someone who will challenge you.`},
     p+='9. Maximum 3-4 paragraphs'+nl;
     p+='10. Write ONLY the email text - nothing else';
 
+    console.log('generateFromPrompts prompt preview:',p.slice(0,300));
     try{
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
