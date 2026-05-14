@@ -419,15 +419,29 @@ window.addEventListener('load',()=>console.log('FAS v2.1 - Team:',typeof Team,'S
 const SB_URL='https://bbzxpeplwufkmaqswyks.supabase.co';
 // API key stored in browser localStorage — never in source code
 let ANTHROPIC_KEY=localStorage.getItem('fas_anthropic_key')||'';
-function getKey(){
-  if(ANTHROPIC_KEY)return ANTHROPIC_KEY;
-  const k=prompt('Enter your Anthropic API key to enable AI features:\n(Get one at console.anthropic.com → API Keys)\n\nThis is stored only in your browser, never uploaded anywhere.');
-  if(k&&k.startsWith('sk-ant')){
-    ANTHROPIC_KEY=k.trim();
-    localStorage.setItem('fas_anthropic_key',ANTHROPIC_KEY);
-    return ANTHROPIC_KEY;
+let PROXY_URL=localStorage.getItem('fas_proxy_url')||'';
+function getKey(){return ANTHROPIC_KEY||null;}
+function saveKey(k){
+  if(!k||!k.trim())return false;
+  const key=k.trim();
+  ANTHROPIC_KEY=key;
+  localStorage.setItem('fas_anthropic_key',key);
+  // Update button indicator
+  const btn=document.getElementById('apiKeyBtn');
+  if(btn){btn.textContent='🔑 Key Active';btn.style.color='var(--lime)';}
+  return true;
+}
+function promptKey(onSuccess){
+  const modal=document.getElementById('apiKeyModal');
+  if(modal){
+    openModal('apiKeyModal');
+    window._apiKeyCallback=onSuccess;
   }
-  return null;
+}
+function checkKey(onSuccess){
+  if(ANTHROPIC_KEY)return onSuccess?onSuccess():true;
+  promptKey(onSuccess);
+  return false;
 }
 const OPENAI_KEY='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';
 const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJienhwZXBsd3Vma21hcXN3eWtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NzMxOTMsImV4cCI6MjA4OTQ0OTE5M30.n9o9buBrpgjNALKC3LeZnbpSjzf-j47hxXp32Ft3WYM';
@@ -884,7 +898,11 @@ const App={
 
     // Show API key button if key not set
     const keyBtn=$('apiKeyBtn');
-    if(keyBtn)keyBtn.style.display='inline-flex';
+    if(keyBtn){
+      keyBtn.style.display='inline-flex';
+      if(ANTHROPIC_KEY){keyBtn.textContent='🔑 Key Active';keyBtn.style.color='var(--lime)';}
+      else{keyBtn.textContent='🔑 Add API Key';keyBtn.style.color='#fbbf24';}
+    }
     if(!localStorage.getItem('fas_anthropic_key')){
       // Show a non-blocking notice
       setTimeout(()=>{
@@ -908,7 +926,54 @@ const App={
     }
   },
 
+  submitKey(){
+    const input=document.getElementById('apiKeyInput');
+    const err=document.getElementById('apiKeyError');
+    const k=input?.value?.trim()||'';
+    if(!k.startsWith('sk-ant')){
+      if(err){err.textContent='That does not look like a valid Anthropic key (must start with sk-ant)';err.style.display='block';}
+      return;
+    }
+    saveKey(k);
+    closeModal('apiKeyModal');
+    if(err)err.style.display='none';
+    if(input)input.value='';
+    // Run the callback if one was set (e.g. retry email generation)
+    if(window._apiKeyCallback){
+      const cb=window._apiKeyCallback;
+      window._apiKeyCallback=null;
+      setTimeout(cb,100);
+    } else {
+      alert('API key saved. AI features are now active.');
+    }
+  },
+
   manageKey(){
+    const currentProxy=localStorage.getItem('fas_proxy_url')||'';
+    const currentKey=localStorage.getItem('fas_anthropic_key')||'';
+    const el=document.getElementById('apiKeyModal');
+    if(!el)return;
+    // Update modal to include proxy URL field
+    el.querySelector('.modal-content').innerHTML='<div class="modal-body">'
+      +'<h3 style="margin-bottom:14px">🔑 API Configuration</h3>'
+      +'<p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">Enter your Vercel proxy URL and Anthropic key. Both are stored only in this browser.</p>'
+      +'<div class="form-group"><label class="label">Vercel Proxy URL</label>'
+        +'<input type="text" id="proxyUrlInput" class="input" placeholder="https://fas-proxy.vercel.app" value="'+currentProxy+'">'
+        +'<div style="font-size:11px;color:var(--text-muted);margin-top:5px">Your Vercel deployment URL — enables transcription and AI features</div>'
+      +'</div>'
+      +'<div class="form-group"><label class="label">Anthropic API Key <span style="color:var(--text-muted);font-weight:400">(optional if using proxy)</span></label>'
+        +'<input type="password" id="apiKeyInput" class="input" placeholder="sk-ant-api03-..." value="'+currentKey+'">'
+      +'</div>'
+      +'<div id="apiKeyError" style="display:none;color:var(--red);font-size:12px;margin-bottom:8px"></div>'
+      +'<div class="modal-footer">'
+        +'<button class="btn" onclick="closeModal(\'apiKeyModal\')">Cancel</button>'
+        +'<button class="btn btn-primary" onclick="App.submitKey()">Save & Continue</button>'
+      +'</div>'
+      +'</div>';
+    openModal('apiKeyModal');
+  },
+
+  _manageKey_old(){
     const current=localStorage.getItem('fas_anthropic_key')||'';
     const msg=current
       ?'Your API key is set (ends in ...'+current.slice(-6)+').\n\nEnter a new key to replace it, or leave blank and click OK to keep the current one:'
@@ -1157,86 +1222,98 @@ const Sessions={
   async transcribeAudio(file){
     const z=$('nsZone');
     const sizeMB=(file.size/1024/1024).toFixed(1);
+    const proxy=PROXY_URL||localStorage.getItem('fas_proxy_url')||'';
 
-    if(file.size>24*1024*1024){
+    if(!proxy){
       if(z)z.innerHTML='<div class="upload-icon">&#10060;</div>'
-        +'<p><strong>File too large ('+sizeMB+'MB)</strong><br>'
-        +'Whisper has a 25MB limit. Try one of these options:<br><br>'
-        +'<strong>Option 1:</strong> Trim the recording to under 45 minutes<br>'
-        +'<strong>Option 2:</strong> On iPhone, go to Settings → Voice Memos → Audio Quality → set to Compressed<br>'
-        +'<strong>Option 3:</strong> Paste the transcript manually in the box below</p>';
+        +'<p><strong>Proxy not configured.</strong><br>'
+        +'Click <strong>🔑 API Key</strong> in the top bar and enter your proxy URL to enable transcription.</p>';
       return null;
     }
 
-    if(z)z.innerHTML='<div class="upload-icon">&#8987;</div>'
-      +'<p><strong>Transcribing '+file.name+'</strong> ('+sizeMB+'MB)…<br>'
-      +'This takes 20–60 seconds. Please wait.</p>';
+    if(file.size>200*1024*1024){
+      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div>'
+        +'<p><strong>File too large ('+sizeMB+'MB)</strong><br>Maximum is 200MB. Try trimming the recording.</p>';
+      return null;
+    }
 
     try{
-      const formData=new FormData();
-      const ext=file.name.split('.').pop().toLowerCase();
-      // Whisper requires specific extensions - rename if needed
-      const validExts=['mp3','mp4','mpeg','mpga','m4a','wav','webm'];
-      const filename=validExts.includes(ext)?file.name:file.name.replace(/\.[^.]+$/,'.m4a');
-      formData.append('file', file, filename);
-      formData.append('model','whisper-1');
-      formData.append('response_format','text');
-      formData.append('language','en');
+      // Step 1 — Upload audio to proxy → AssemblyAI
+      if(z)z.innerHTML='<div class="upload-icon">&#8987;</div>'
+        +'<p><strong>Uploading '+file.name+'</strong> ('+sizeMB+'MB)…<br>Step 1 of 3 — uploading audio</p>';
 
-      const resp=await fetch('https://api.openai.com/v1/audio/transcriptions',{
+      const uploadResp=await fetch(proxy+'/api/whisper',{
         method:'POST',
-        headers:{'Authorization':'Bearer '+OPENAI_KEY},
-        body:formData
+        headers:{'Content-Type':file.type||'audio/mp4','x-action':'upload'},
+        body:file
       });
-
-      if(!resp.ok){
-        const errText=await resp.text();
-        let errMsg='';
-        try{const j=JSON.parse(errText);errMsg=j.error?.message||errText;}
-        catch{errMsg=errText.slice(0,200);}
-        console.error('Whisper error:',resp.status,errMsg);
-
-        let userMsg='';
-        if(resp.status===401)userMsg='OpenAI API key issue. Please contact support.';
-        else if(resp.status===413)userMsg='File too large. Try compressing or trimming the audio.';
-        else if(resp.status===429)userMsg='Too many requests — please wait 30 seconds and try again.';
-        else if(resp.status===415)userMsg='Format not supported. Rename the file to .m4a and try again.';
-        else userMsg='Whisper error ('+resp.status+'): '+errMsg;
-
-        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div>'
-          +'<p><strong>'+userMsg+'</strong><br><br>'
-          +'Paste your transcript manually in the box below.</p>';
+      if(!uploadResp.ok){
+        const err=await uploadResp.json();
+        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>Upload failed: '+(err.error||uploadResp.status)+'</strong><br>Check your proxy URL and try again.</p>';
         return null;
       }
+      const{upload_url}=await uploadResp.json();
 
-      const text=await resp.text();
-      if(!text||text.trim().length<10){
-        if(z)z.innerHTML='<div class="upload-icon">&#9888;</div>'
-          +'<p>Transcription returned empty text. The audio may be too quiet.<br><br>'
-          +'Paste your transcript manually below.</p>';
+      // Step 2 — Submit for transcription
+      if(z)z.innerHTML='<div class="upload-icon">&#8987;</div>'
+        +'<p><strong>Transcribing…</strong><br>Step 2 of 3 — sending to AssemblyAI</p>';
+
+      const submitResp=await fetch(proxy+'/api/whisper',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-action':'submit'},
+        body:JSON.stringify({upload_url})
+      });
+      if(!submitResp.ok){
+        const err=await submitResp.json();
+        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>Transcription submit failed: '+(err.error||submitResp.status)+'</strong></p>';
         return null;
       }
-      return text.trim();
+      const{transcript_id}=await submitResp.json();
+
+      // Step 3 — Poll until complete
+      if(z)z.innerHTML='<div class="upload-icon">&#8987;</div>'
+        +'<p><strong>Transcribing your session…</strong><br>Step 3 of 3 — this takes 2–4 minutes for a full session. Please wait.</p>';
+
+      for(let i=0;i<120;i++){
+        await new Promise(r=>setTimeout(r,5000)); // poll every 5 seconds
+
+        const pollResp=await fetch(proxy+'/api/whisper',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','x-action':'poll','x-transcript-id':transcript_id},
+          body:JSON.stringify({})
+        });
+
+        if(!pollResp.ok) continue;
+        const poll=await pollResp.json();
+
+        if(poll.status==='completed'){
+          if(!poll.text||poll.text.trim().length<20){
+            if(z)z.innerHTML='<div class="upload-icon">&#9888;</div><p>Transcription returned empty text. The audio may be too quiet.<br><br>Paste your transcript manually below.</p>';
+            return null;
+          }
+          if(z)z.innerHTML='<div class="upload-icon">&#10003;</div>'
+            +'<p><strong>'+file.name+'</strong> transcribed successfully ✓<br>Review the text below, then click Analyse Session.</p>';
+          return poll.text.trim();
+        }
+
+        if(poll.status==='error'){
+          if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>Transcription error: '+(poll.error||'unknown')+'</strong><br><br>Paste your transcript manually below.</p>';
+          return null;
+        }
+
+        // Update progress message
+        const mins=Math.floor(i*5/60),secs=(i*5)%60;
+        if(z)z.innerHTML='<div class="upload-icon">&#8987;</div>'
+          +'<p><strong>Transcribing…</strong> '+mins+'m '+secs+'s elapsed<br>'
+          +'Status: '+poll.status+'. Typically 2–4 minutes for a full session.</p>';
+      }
+
+      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p>Transcription timed out. The audio may be very long.<br><br>Paste your transcript manually below.</p>';
+      return null;
 
     }catch(e){
-      console.error('Transcription error:',e.name, e.message);
-
-      // CORS or network failure - give specific instructions
-      const isCORS=e.message?.includes('CORS')||e.message?.includes('Failed to fetch')||e.name==='TypeError';
-
-      if(isCORS){
-        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div>'
-          +'<p><strong>Browser blocked the upload (CORS restriction).</strong><br><br>'
-          +'This happens on some browsers. Try one of these:<br><br>'
-          +'<strong>Option 1 — Use the iPhone app:</strong> Open FAS in Safari on iPhone, tap Share → Add to Home Screen, then upload from there.<br><br>'
-          +'<strong>Option 2 — Use Chrome on desktop:</strong> Chrome handles this more reliably than Firefox or Safari on Mac.<br><br>'
-          +'<strong>Option 3 — Paste transcript manually:</strong> Open your Voice Memo in a transcription app (like Otter.ai or Apple built-in transcription) and paste the text below.<br><br>'
-          +'<strong>Option 4 — Use Rev.com or Otter.ai</strong> for a quick free transcription, then paste below.</p>';
-      } else {
-        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div>'
-          +'<p><strong>Connection error: '+e.message+'</strong><br><br>'
-          +'Check your internet connection and try again, or paste your transcript manually below.</p>';
-      }
+      console.error('Transcription error:',e);
+      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>Error: '+e.message+'</strong><br><br>Check your internet connection and try again, or paste transcript manually.</p>';
       return null;
     }
   },
@@ -1261,6 +1338,10 @@ const Sessions={
     const ag=$('ns-age')?.value||'';
     const transcript=$('ns-transcript')?.value?.trim()||'';
     if(!transcript){alert('Please paste a transcript or upload a voice memo file first.');return;}
+    if(!ANTHROPIC_KEY){
+      promptKey(()=>Sessions.analyse());
+      return;
+    }
     $('ns-processing').style.display='block';
     const metrics=Sessions.parseTranscript(transcript);
     const aiResult=await Sessions.callAI(transcript,title,ag,metrics);
@@ -1322,7 +1403,7 @@ const Sessions={
       const prompt=Framework.buildAIPrompt(transcript,title,ag,metrics,isGameDay);
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':getKey(),'anthropic-dangerous-direct-browser-access':'true'},
+        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:prompt}]})
       });
       if(!resp.ok)return Sessions.basicFeedback(metrics,ag);
@@ -2329,6 +2410,10 @@ Write a reflection. Share it with someone who will challenge you.`},
 
   async generateEmailAI(wk){
     const isGame=(State.weeklyEmails[wk]?.email_type==='pregame');
+    if(!ANTHROPIC_KEY){
+      promptKey(()=>Team.generateEmailAI(wk));
+      return;
+    }
     const ep=document.getElementById('ep-'+wk);
     const eb=document.getElementById('et-body-'+wk);
     if(ep)ep.style.display='block';
@@ -2420,7 +2505,7 @@ Write a reflection. Share it with someone who will challenge you.`},
     try{
       const resp=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':getKey(),'anthropic-dangerous-direct-browser-access':'true'},
+        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,messages:[{role:'user',content:p}]})
       });
       const body=resp.ok?(await resp.json()).content[0].text.trim():Team.fallbackEmail(isGame,training,games,schedule,extraContext,name);
@@ -2778,6 +2863,14 @@ Write a reflection. Share it with someone who will challenge you.`},
   },
 
   async generateFromPrompts(wk,isGame){
+    if(!ANTHROPIC_KEY){
+      promptKey(()=>Team.generateEmailAI(wk));
+      return;
+    }
+    if(!ANTHROPIC_KEY){
+      promptKey(()=>Team.generateFromPrompts(wk,isGame));
+      return;
+    }
     const ep=document.getElementById('ep-'+wk);
     const eb=document.getElementById('et-body-'+wk);
     if(ep)ep.style.display='block';
@@ -2838,14 +2931,11 @@ Write a reflection. Share it with someone who will challenge you.`},
 
     console.log('generateFromPrompts prompt preview:',p.slice(0,300));
     try{
-      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      const _apiUrl=PROXY_URL?PROXY_URL+'/api/anthropic':'https://api.anthropic.com/v1/messages';
+      const _headers=PROXY_URL?{'Content-Type':'application/json'}:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'};
+      const resp=await fetch(_apiUrl,{
         method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'anthropic-version':'2023-06-01',
-          'x-api-key':getKey(),
-          'anthropic-dangerous-direct-browser-access':'true'
-        },
+        headers:_headers,
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,messages:[{role:'user',content:p}]})
       });
 
@@ -4053,6 +4143,29 @@ if('serviceWorker' in navigator){
 
 </script>
 
+
+<!-- API KEY MODAL -->
+<div class="modal-bg" id="apiKeyModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">🔑 Add Your API Key</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">
+      FAS uses the Anthropic API for session analysis and email generation.
+      Your key is stored only in this browser — it is never uploaded or shared.
+    </p>
+    <div class="form-group">
+      <label class="label">Anthropic API Key</label>
+      <input type="password" id="apiKeyInput" class="input" placeholder="sk-ant-api03-..." autocomplete="off">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:6px">
+        Get your key at <strong>console.anthropic.com</strong> → Settings → API Keys → Create Key
+      </div>
+    </div>
+    <div id="apiKeyError" style="display:none;color:var(--red);font-size:12px;margin-bottom:8px"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('apiKeyModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="App.submitKey()">Save Key & Continue</button>
+    </div>
+  </div>
+</div>
 
 <!-- RESOURCE MODAL -->
 <div class="modal-bg" id="resourceModal">
