@@ -2650,9 +2650,12 @@ Write a reflection. Share it with someone who will challenge you.`},
     p+='12. Write ONLY the email text — no subject line, no commentary\n';
 
     try{
-      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      const _eu=PROXY_URL||localStorage.getItem('fas_proxy_url')||'';
+      const _eurl=_eu?_eu+'/api/anthropic':'https://api.anthropic.com/v1/messages';
+      const _ehdr=_eu?{'Content-Type':'application/json'}:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'};
+      const resp=await fetch(_eurl,{
         method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'},
+        headers:_ehdr,
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,messages:[{role:'user',content:p}]})
       });
       const body=resp.ok?(await resp.json()).content[0].text.trim():Team.fallbackEmail(isGame,training,games,schedule,extraContext,name);
