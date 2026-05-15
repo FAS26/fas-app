@@ -661,157 +661,208 @@ FREEZE STANDARD: The ball demonstrates. Coach does NOT bring players in and lect
     const n=ageNum(ageGroup||'U10');
     const sessionType=isGameDay?'GAME DAY COACHING REPORT':'TRAINING SESSION TRANSCRIPT';
 
-    // Age-specific grading rubric
+    // ── AGE-SPECIFIC FOCUS AREA CONSTRAINTS ──────────────────────────────
+    // These are the ONLY acceptable focus areas per age group
+    // Claude must choose from these - not invent generic coaching advice
+    let focusMenu='';
+    let forbiddenFocus='';
+
+    if(n<=7){
+      focusMenu=`ACCEPTABLE FOCUS AREAS FOR U6/U7 (choose 2 from this list only):
+- Energy and enthusiasm — was the coach's energy high enough to match 6-7 year olds?
+- Individual ball contact — did every player have a ball at their feet as much as possible?
+- Age-appropriate language — were instructions short (under 10 seconds), visual, and fun?
+- Visual metaphors — did the coach use fun images like "sneaky snake", "ball on a leash", "fastest feet"?
+- Specific individual praise — did the coach praise individual players by name for specific actions?
+- Fun and smiling — was the environment joyful and movement-based throughout?
+- Dribbling focus — was dribbling the primary technical skill being developed?`;
+      forbiddenFocus=`FORBIDDEN FOCUS AREAS FOR U6/U7 — NEVER suggest these:
+- High-order questions (completely inappropriate at this age)
+- Freeze moments (attention spans cannot handle this — forbidden)
+- Tactical coaching of any kind (positions, shape, game moments)
+- Team shape or collective play
+- Pressure-cover or any defensive system
+- Q:I ratio improvement (not a meaningful metric at this age)
+- Any metric that implies tactical awareness`;
+    } else if(n<=8){
+      focusMenu=`ACCEPTABLE FOCUS AREAS FOR U8 (choose 2 from this list only):
+- Visual metaphors and relatable language — peanut butter spread, belly button laser, foot as a pillow, ball on a leash
+- Individual ball contact — one player one ball for technical work
+- 1v1 situations — was the game model primarily 1v1?
+- Specific individual praise by name — catching players doing things right
+- Fun and energy — was the session enjoyable and movement-based?
+- Dribbling as primary skill — keeping ball close, both feet, changing direction
+- Simple guided questions — "what did you do there?" "where did you look?"`;
+      forbiddenFocus=`FORBIDDEN FOCUS AREAS FOR U8 — NEVER suggest these:
+- High-order questions (1 simple guided question is the maximum expectation)
+- Freeze moments (not expected at this age)
+- Tactical coaching, team shape, positions
+- Pressure-cover or collective defending
+- Any reference to game moments framework`;
+    } else if(n<=10){
+      focusMenu=`ACCEPTABLE FOCUS AREAS FOR U9/U10 (choose 2 from this list only):
+- 2v1 and 2v2 game model — is the primary structure small-sided collective problem solving?
+- Guided questions during play — "what did you see?" "where was your teammate?" (target: 3)
+- Pressure-Cover defending introduction — two defenders working together
+- Visual metaphors alongside growing football vocabulary — rubber band width, escape route
+- Brainstorming solutions with players — asking before answering
+- Effort praised over outcome — praising trying, not result
+- Position awareness introduction — players hearing role names without being fixed`;
+      forbiddenFocus=`FORBIDDEN FOCUS AREAS FOR U9/U10 — NEVER suggest these:
+- Freeze moments as a primary focus (only just beginning to be introduced)
+- Full tactical system coaching
+- Position-specific feedback
+- Complex game moments analysis`;
+    } else if(n<=12){
+      focusMenu=`ACCEPTABLE FOCUS AREAS FOR U11/U12 (choose 2 from this list only):
+- Position-specific coaching — was the coach referencing player roles?
+- Pressure-Cover-Balance defending — introducing the third defender
+- High-order questions — connecting individual actions to team outcomes (target: 5)
+- Freeze moments — did the coach freeze, ask, demo with ball, rehearse, restart? (target: 2)
+- Freeze moment quality — did the coach coach ALL players not just ball carrier?
+- Team shape reference — was the coach connecting individual actions to collective shape?
+- Rich metaphors alongside football vocabulary — third-man run as "surprise guest"`;
+      forbiddenFocus=`FORBIDDEN FOCUS AREAS FOR U11/U12 — NEVER suggest these:
+- Basic fun/energy (that is U6/U8 feedback — inappropriate here)
+- Simple dribbling metaphors as primary focus
+- Individual-only ball work as primary concern`;
+    } else if(n<=14){
+      focusMenu=`ACCEPTABLE FOCUS AREAS FOR U13/U14 (choose 2 from this list only):
+- Freeze moment quality — did the coach coach ALL players on relevant team? (target: 3)
+- Cues and triggers — did the coach name the specific trigger for each player behaviour?
+- Why/When/How/Where/What — was the coach explaining the full rationale?
+- High-order questions — complex questions connecting individual to team (target: 7)
+- Player autonomy — were players given moments to solve problems themselves?
+- Position-specific player behaviours — were behaviours named precisely for each role?
+- In-the-flow sideline coaching — was coaching happening during play not just stoppages?`;
+      forbiddenFocus=`FORBIDDEN FOCUS AREAS FOR U13/U14 — NEVER suggest these:
+- Fun and energy as primary concern
+- Basic metaphors (peanut butter etc — completely inappropriate)
+- Simple dribbling focus`;
+    } else {
+      focusMenu=`ACCEPTABLE FOCUS AREAS FOR U15-U18 (choose 2 from this list only):
+- Position-specific depth — was every piece of feedback connected to the positional role?
+- System-level connections — were individual actions connected to team shape and outcomes?
+- Whole-team freeze moments — did freeze moments coach every player not just ball-near?
+- High-order questions — complex system-level questions (target: 9+)
+- Player-led moments — were players initiating and self-evaluating?
+- Cues and triggers — were triggers highly specific to the game situation?
+- Physical and personal fulfilment — was the coach connecting execution to the player's goals?`;
+      forbiddenFocus=`FORBIDDEN FOCUS AREAS FOR U15-U18 — NEVER suggest these:
+- Fun and energy as primary concern
+- Basic metaphors or simple language advice
+- Generic encouragement without positional specificity`;
+    }
+
+    // ── GRADING RUBRIC ────────────────────────────────────────────────────
     let gradingRubric='';
     if(n<=7){
-      gradingRubric=`GRADING RUBRIC FOR U6/U7:
-A: High energy and enthusiasm throughout. Every player has a ball. Instructions under 10 seconds. Visual metaphors used naturally. Specific individual praise by name. Zero tactical language. Players smiling and moving constantly.
-B: Good energy. Most players active with a ball. Some good metaphors or fun language. Generally positive. Minor instances of over-instruction or tactical language.
-C: Adequate energy but some long instruction periods. Occasional tactical language. Some players standing. Limited use of fun visual language.
-D: Coach-dominated session. Long explanations. Tactical instructions inappropriate for age. Players waiting in lines. Limited individual ball contact.
-DO NOT penalise absence of high-order questions at this age. DO NOT expect tactical awareness.`;
+      gradingRubric=`GRADING FOR U6/U7:
+A: High energy throughout. Every player has a ball. Instructions under 10 seconds. Visual metaphors used. Specific individual praise by name. Zero tactical language.
+B: Good energy. Most players active. Some metaphors or fun language. Generally positive. Minor over-instruction.
+C: Some long instruction periods. Occasional tactical language. Some players standing. Limited visual language.
+D: Coach-dominated. Long explanations. Tactical instructions. Players waiting. Limited ball contact.
+IMPORTANT: Do NOT penalise absence of high-order questions. Do NOT penalise absence of freeze moments. Do NOT mention these as areas to improve.`;
     } else if(n<=8){
-      gradingRubric=`GRADING RUBRIC FOR U8:
-A: Fun, energetic session. Individual player focus (one player one ball). Excellent visual metaphors and relatable comparisons used (belly button laser, foot as a pillow, peanut butter spreading). 1v1 situations primary game model. Specific praise by name. At least 1 guided question. Zero tactical group instruction.
-B: Good energy. Individual focus maintained. Some use of visual language. Positive environment. Minor tactical language creeping in.
-C: Some fun moments but instruction-heavy periods. Limited visual language. Some tactical group coaching. Players not always active with a ball.
+      gradingRubric=`GRADING FOR U8:
+A: Fun energetic session. Individual focus (one player one ball). Excellent visual metaphors used. 1v1 situations primary. Specific praise by name. Simple guided questions present. Zero tactical instruction.
+B: Good energy. Individual focus maintained. Some visual language. Positive environment.
+C: Instruction-heavy periods. Limited visual language. Some tactical coaching. Players not always active with a ball.
 D: Tactical instructions dominant. Group standing and listening. No visual metaphors. High correction ratio.
-DO NOT penalise absence of high-order questions at this age.`;
+IMPORTANT: Do NOT penalise absence of high-order questions. Do NOT suggest freeze moments.`;
     } else if(n<=10){
-      gradingRubric=`GRADING RUBRIC FOR U9/U10:
-A: 2v1 and 2v2 situations primary model. Visual metaphors used alongside growing football vocabulary. Defending in pairs (pressure-cover) introduced. Player input sought. At least 3 high-order questions. Brainstorming solutions collectively. Effort praised over outcome. Positions introduced without being rigid.
-B: Good collective focus. Some good questions. Mostly positive environment. Some positional awareness introduced. Minor over-instruction.
-C: Some collective play but coach-directed. Few questions. Limited positional introduction. Praise inconsistent.
-D: Individual-only focus with no collective problem solving. No questions. High correction ratio. No positional awareness introduced.`;
+      gradingRubric=`GRADING FOR U9/U10:
+A: 2v1/2v2 primary model. Visual metaphors alongside football vocabulary. Pressure-Cover introduced. Player input sought. At least 3 guided questions. Effort praised over outcome. Positions introduced.
+B: Good collective focus. Some good questions. Mostly positive. Some positional awareness.
+C: Coach-directed. Few questions. Limited positional introduction. Praise inconsistent.
+D: Individual-only focus. No questions. High correction ratio. No positional awareness.`;
     } else if(n<=12){
-      gradingRubric=`GRADING RUBRIC FOR U11/U12:
-A: Position-specific coaching present. 3v1/3v2 game model. Pressure-Cover-Balance introduced for defending. At least 5 high-order questions. Freeze moments (2+) with ball demonstration — coaching ALL players not just ball-carrier. Questions connect individual actions to team outcomes. Rich metaphors alongside football vocabulary.
-B: Good positional awareness coaching. 4+ questions. At least 1 freeze with ball demo. Some team connection in feedback.
-C: Some positional coaching but not consistent. 2-3 questions. Freeze moments without ball demo. Coaching only ball-carrier.
-D: Generic coaching. No positional reference. Few questions. No freeze moments or poor freeze technique. No connection to team shape.`;
+      gradingRubric=`GRADING FOR U11/U12:
+A: Position-specific coaching. 3v1/3v2 model. Pressure-Cover-Balance introduced. 5+ high-order questions. Freeze moments with ball demo coaching ALL players. Questions connect individual to team.
+B: Good positional awareness. 4+ questions. At least 1 good freeze. Some team connection.
+C: Some positional coaching. 2-3 questions. Freeze moments without ball demo or coaching only ball-carrier.
+D: Generic coaching. No positional reference. Few questions. No freeze moments.`;
     } else if(n<=14){
-      gradingRubric=`GRADING RUBRIC FOR U13/U14:
-A: Every freeze moment coaches ALL players on the relevant team — player with ball, support players, AND players away from ball. Cues and triggers named specifically. Why/When/How/Where/What explained. 7+ high-order questions. Player behaviours named precisely. Player autonomy moments present.
-B: Good tactical depth. 5-6 questions. Freeze moments reasonably complete. Some cues and triggers named. Mostly specific to positions.
-C: Some tactical coaching but generic. 3-4 questions. Freeze moments incomplete (only ball-near players coached). Cues not named.
-D: Generic coaching. Tactical language without specifics. Few questions. Poor freeze technique. Not coaching the whole team in freeze moments.`;
+      gradingRubric=`GRADING FOR U13/U14:
+A: Freeze moments coach ALL players. Cues and triggers named. Why/When/How/Where/What explained. 7+ high-order questions. Player behaviours named precisely. Player autonomy moments.
+B: Good tactical depth. 5-6 questions. Freeze moments reasonably complete. Some cues named.
+C: Some tactical coaching but generic. 3-4 questions. Freeze incomplete. Cues not named.
+D: Generic coaching. Poor freeze technique. Few questions. Not coaching whole team.`;
     } else {
-      gradingRubric=`GRADING RUBRIC FOR U15-U18:
-A: Highly position-specific coaching. Every freeze coaches the whole team. Cues and triggers precise and connected to system. 9+ high-order questions. Players solving problems. Coach facilitating not directing. Individual actions connected to team outcomes. Physical and personal fulfilment referenced.
+      gradingRubric=`GRADING FOR U15-U18:
+A: Highly position-specific. Every freeze coaches whole team. 9+ questions. Players solving problems. Individual actions connected to team outcomes.
 B: Good positional specificity. 7-8 questions. Freeze mostly complete. Some system-level connections.
-C: Some position-specific coaching but inconsistent. 4-6 questions. Coach still directing too much. Individual actions not connected to team.
-D: Generic coaching. Not position-specific. Coach-dominated. Few questions. No system-level thinking evident.`;
+C: Some position-specific coaching. 4-6 questions. Coach still directing too much.
+D: Generic coaching. Not position-specific. Coach-dominated. Few questions.`;
     }
 
-    return `You are Jamie McLeod, a senior US Soccer coaching educator with expertise in the Player Development Framework and C/D License evaluation. You are evaluating a ${sessionType} submitted by a coach for professional feedback.
-
-Your feedback must be SPECIFIC to this age group (${ageGroup}), this session, and what you actually observe in the transcript. Generic feedback that could apply to any coach at any age is NOT acceptable.
-
-${sessionType}: "${title}" | Age Group: ${ageGroup||'Unknown'}
-Developmental Stage: ${ctx.dev} | Framework Phase: ${ctx.phase}
-
-${ctx.coaching}
-
-${standards}
-
-${gradingRubric}
-
-METRICS DETECTED FROM TRANSCRIPT:
-- Q:I ratio: ${metrics.qi_ratio} (target for ${ageGroup}: ${ctx.targets.qi})
-- P:C ratio: ${metrics.pc_ratio} (target: 3.0 minimum)
-- High-order questions: ${metrics.high_order_q} (target: ${ctx.targets.hq})
-- Low-order questions: ${metrics.low_order_q}
-- Individual praise: ${metrics.individual_praise}
-- Team praise: ${metrics.team_praise}
-- Positive reinforcement: ${metrics.positive_reinforcement}
-- Technical feedback: ${metrics.technical_feedback}
-- Tactical feedback: ${metrics.tactical_feedback}
-- Demonstrations: ${metrics.show_me_count}
-- Freeze moments: ${metrics.freeze_moment}
-- Words spoken: ${metrics.word_count}
-
-TRANSCRIPT (first 3000 chars):
-${transcript.slice(0,3000)}
-
-EVALUATION INSTRUCTIONS:
-1. Grade this session AGAINST THE SPECIFIC RUBRIC for ${ageGroup} above — not a generic standard
-2. Encouragement must reference ACTUAL BEHAVIOURS from the transcript — quote or paraphrase specific moments
-3. Focus areas must be AGE-APPROPRIATE — do NOT suggest high-order questions for U6/U7/U8 as a primary concern
-4. Actions must be SPECIFIC and ACTIONABLE for this age group and session topic
-5. If the coach used visual metaphors or age-appropriate language, name and praise them specifically
-6. If the coach used language or tactics inappropriate for this age, name the specific instance
-7. The gradeLabel should describe THIS session specifically, not a generic description
-
-Respond ONLY with valid JSON — no preamble, no backticks, no markdown:
-{
-  "grade": "A|B|C|D",
-  "gradeLabel": "specific one-line description of THIS session for THIS age group",
-  "encouragement": "2-3 warm specific sentences naming actual behaviours observed from the transcript. Be genuine and specific — not generic.",
-
-  "planning": {
-    "summary": "2-3 sentences on planning quality for this age group. Did the session connect to a clear game moment and developmental priority?",
-    "subpoints": [
-      "Game moment identified: [what was observed or not observed in transcript]",
-      "Main/Sub principle clarity: [what was observed]",
-      "Player actions aligned to topic: [what was observed]",
-      "Transition time between activities: [estimate based on transcript — was setup efficient or did play stop unnecessarily?]",
-      "Age-appropriate design: [did the structure match ${ageGroup} cognitive, physical, social, emotional needs?]"
-    ]
+    const nl='\n';
+    return 'You are Jamie McLeod, a senior US Soccer coaching educator evaluating a '+sessionType+'.'+nl+nl
+      +'CRITICAL INSTRUCTION: You are evaluating a '+ageGroup+' session. Every piece of feedback MUST be calibrated to this specific age group. Generic coaching advice that ignores the developmental stage is unacceptable.'+nl+nl
+      +'SESSION: "'+title+'" | Age Group: '+ageGroup+' | Stage: '+ctx.dev+' | Phase: '+ctx.phase+nl+nl
+      +'AGE-SPECIFIC COACHING STANDARD:'+nl+ctx.coaching+nl+nl
+      +'LICENSE EVALUATION FRAMEWORK:'+nl+standards+nl+nl
+      +gradingRubric+nl+nl
+      +'DETECTED METRICS:'+nl
+      +'- Q:I ratio: '+metrics.qi_ratio+' (target for '+ageGroup+': '+ctx.targets.qi+')'+nl
+      +'- P:C ratio: '+metrics.pc_ratio+' (target: 3.0 minimum)'+nl
+      +'- High-order questions: '+metrics.high_order_q+' (target for '+ageGroup+': '+ctx.targets.hq+')'+nl
+      +'- Individual praise: '+metrics.individual_praise+nl
+      +'- Freeze moments: '+metrics.freeze_moment+' (target for '+ageGroup+': '+ctx.targets.freeze+')'+nl
+      +'- Demonstrations: '+metrics.show_me_count+nl
+      +'- Words spoken: '+metrics.word_count+nl+nl
+      +'TRANSCRIPT (first 3000 chars):'+nl+transcript.slice(0,3000)+nl+nl
+      +'FOCUS AREA SELECTION — READ THIS CAREFULLY:'+nl
+      +focusMenu+nl+nl
+      +forbiddenFocus+nl+nl
+      +'EVALUATION INSTRUCTIONS:'+nl
+      +'1. Grade ONLY against the '+ageGroup+' rubric above'+nl
+      +'2. Encouragement must quote or paraphrase ACTUAL moments from the transcript'+nl
+      +'3. Focus areas MUST be chosen from the ACCEPTABLE list above — nothing else'+nl
+      +'4. NEVER mention high-order questions as a concern for U6/U7/U8'+nl
+      +'5. NEVER suggest freeze moments for U6/U7/U8'+nl
+      +'6. If the coach used visual metaphors, name them specifically and praise them'+nl
+      +'7. The profile label should describe this coach in this session accurately'+nl+nl
+      +'Respond ONLY with valid JSON — no preamble, no backticks, no markdown:'+nl
+      +'{'+nl
+      +'  "grade": "A|B|C|D",'+nl
+      +'  "gradeLabel": "specific one-line description of THIS session",'+nl
+      +'  "encouragement": "2-3 warm specific sentences naming actual behaviours from the transcript",'+nl
+      +'  "profileLabel": "One of: Game-Aware Communicator | Player-Centred Coach | Game-Aware Building Player Voice | Direction-Heavy Tactically Sharp | Encouraging Presence Developing Structure | Question-Led Developer | Positive Coach Deepening Tactical Understanding | Energy-First Fun Coach | Relationship-Led Developer",'+nl
+      +'  "focusCueTitle": "Short imperative — chosen from the ACCEPTABLE focus areas list for '+ageGroup+'",'+nl
+      +'  "focusCueWhy": "1-2 sentences citing specific transcript moments. Age-appropriate explanation.",'+nl
+      +'  "focusCueQuote": "An exact phrase the coach could say or do next session — appropriate for '+ageGroup+' players",'+nl
+      +'  "planning": {'+nl
+      +'    "summary": "2-3 sentences on planning quality appropriate for '+ageGroup+'",'+nl
+      +'    "subpoints": ["Game moment identified: [observed or not]","Main/Sub principle clarity: [observed]","Player actions aligned: [observed]","Transition time: [estimate from transcript]","Age-appropriate design for '+ageGroup+': [observed]"]'+nl
+      +'  },'+nl
+      +'  "organisation": {'+nl
+      +'    "summary": "2-3 sentences on organisation quality",'+nl
+      +'    "subpoints": ["Ball rolling time: [observed]","Activity transitions: [observed]","Player activity level: [observed]","Challenge level for '+ageGroup+': [observed]","Freeze moment timing: [observed — note target for '+ageGroup+' is '+( n<=7?'not expected':n<=8?'not expected':n<=10?'under 2 min':n<=12?'2-3 min':'3-4 min')+']"]'+nl
+      +'  },'+nl
+      +'  "coachingInteractions": {'+nl
+      +'    "summary": "2-3 sentences on coaching interaction quality for '+ageGroup+'",'+nl
+      +'    "howWhen": ['+nl
+      +'      {"item": "Observe and Adapt", "evidence": "Example from transcript or not observed"},'+nl
+      +'      {"item": "Positive Reinforcement", "evidence": "Specific example from transcript or not observed"},'+nl
+      +'      {"item": "Key Words connected to session topic", "evidence": "Example or not observed"},'+nl
+      +'      {"item": "Questions — appropriate for '+ageGroup+'", "evidence": "Quote a question or note absence — evaluate against '+ageGroup+' standard"},'+nl
+      +'      {"item": "Demonstrate with the ball", "evidence": "Example or not observed"},'+nl
+      +'      {"item": "Directive Guidance — appropriate delivery for '+ageGroup+'", "evidence": "Example from transcript"},'+nl
+      +'      {"item": "In the flow — sideline coaching during play", "evidence": "Example or not observed"},'+nl
+      +'      {"item": "Visual metaphors and age-appropriate language for '+ageGroup+'", "evidence": "Quote any metaphors used. If none, note this for '+ageGroup+'"}'+nl
+      +'    ]'+nl
+      +'  },'+nl
+      +'  "focus1": "First focus area title — MUST be from the acceptable list for '+ageGroup+'",'+nl
+      +'  "focus2": "Second focus area title — MUST be from the acceptable list for '+ageGroup+'",'+nl
+      +'  "actions": ['+nl
+      +'    {"area": "focus1 title","action": "One concrete action for next session — '+ageGroup+' appropriate","tip": "One practical tip","why": "Why this matters for '+ageGroup+' development"},'+nl
+      +'    {"area": "focus2 title","action": "One concrete action — '+ageGroup+' appropriate","tip": "One practical tip","why": "Why this matters for '+ageGroup+'"}'+nl
+      +'  ],'+nl
+      +'  "feedforward": "One paragraph as Jamie McLeod — warm expert specific to this session and '+ageGroup+'. Reference: Assess, Identify Goals, Plan, Implement, Analyse, Reflect, Reassess. End with genuine encouragement."'+nl
+      +'}';
   },
 
-  "organisation": {
-    "summary": "2-3 sentences on organisation quality. Focus on ball rolling time and player activity.",
-    "subpoints": [
-      "Ball rolling time: [was play maximised or were there long pauses?]",
-      "Activity transitions: [evidence from transcript of smooth or slow transitions]",
-      "Player activity level: [were all players active or were there lines/waiting?]",
-      "Challenge level: [was the difficulty appropriate for ${ageGroup}?]",
-      "Freeze moment timing: [how long were stoppages? Target for ${ageGroup}: ${n<=7?'No freezes expected':n<=8?'under 1 min':n<=10?'under 2 min':n<=12?'2-3 min':'3-4 min'}. How many freeze moments occurred and was ball rolling time between them sufficient?]"
-    ]
-  },
-
-  "coachingInteractions": {
-    "summary": "2-3 sentences on the quality of coaching interactions. What was the dominant style?",
-    "howWhen": [
-      {"item": "Observe and Adapt", "evidence": "Quote or paraphrase a moment from the transcript where the coach observed and adapted, OR state that no clear example was detected"},
-      {"item": "Positive Reinforcement", "evidence": "Quote or paraphrase a specific example from the transcript, OR state not observed"},
-      {"item": "Key Words / Player Actions connected to session topic", "evidence": "Example from transcript or not observed"},
-      {"item": "Questions — Guided to check for understanding and reflect", "evidence": "Quote a specific question from the transcript or note absence. Note whether questions were appropriate for ${ageGroup}"},
-      {"item": "Demonstrate — model with the ball", "evidence": "Example from transcript or not observed"},
-      {"item": "Directive Guidance — telling players what to do at appropriate moments", "evidence": "Example from transcript. Note whether the language and delivery was appropriate for ${ageGroup}"},
-      {"item": "Feedback — specific to player behaviour", "evidence": "Example from transcript or not observed"},
-      {"item": "In the flow — sideline coaching during play", "evidence": "Example from transcript or not observed"},
-      {"item": "Freeze Moment — Freeze, Question, Demo with ball, Rehearse, Restart", "evidence": "Describe what happened in the freeze moment(s) from the transcript. Was the full sequence followed? Were ALL players on the relevant team coached?"},
-      {"item": "Visual metaphors and age-appropriate language", "evidence": "Quote any metaphors or visual language used. If none, note this as a development area for ${ageGroup}"}
-    ]
-  },
-
-  "gameMoment": "Which game moment did this session address? Was it appropriate for ${ageGroup}?",
-  "objectiveAlignment": "One sentence on whether coaching language connected to the session topic.",
-
-  "focus1": "First development area title",
-  "focus2": "Second development area title",
-  "actions": [
-    {
-      "area": "focus area 1 title",
-      "action": "One specific concrete action for the very next session — appropriate for ${ageGroup}",
-      "tip": "One practical tip",
-      "why": "Why this matters for ${ageGroup} development"
-    },
-    {
-      "area": "focus area 2 title",
-      "action": "One specific concrete action — appropriate for ${ageGroup}",
-      "tip": "One practical tip",
-      "why": "Why this matters for ${ageGroup}"
-    }
-  ],
-  "feedforward": "One paragraph in the voice of Jamie McLeod — warm, expert, specific to this session and ${ageGroup}. Reference: Assess, Identify Goal and Objectives, Plan, Implement, Analyse and Reflect, Reassess. End with genuine encouragement.",
-  "profileLabel": "One of: Game-Aware Communicator | Player-Centred Coach | Game-Aware, Building Player Voice | Direction-Heavy, Tactically Sharp | Encouraging Presence, Developing Structure | Question-Led Developer | Positive Coach, Deepening Tactical Understanding — pick the single best fit for this coach in this session",
-  "focusCueTitle": "Short imperative title for the one thing to work on next session — e.g. Replace instructions with discovery questions during play",
-  "focusCueWhy": "1-2 sentences diagnosing why this is the priority, citing specific moments from the transcript",
-  "focusCueQuote": "An exact phrase the coach could say next session to put this into practice"
-}`;
-  },
 };
 
 const Auth={
