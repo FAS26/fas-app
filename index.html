@@ -1503,16 +1503,33 @@ const Sessions={
   async callAI(transcript,title,ag,metrics,isGameDay=false){
     try{
       const prompt=Framework.buildAIPrompt(transcript,title,ag,metrics,isGameDay);
-      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      const proxy=PROXY_URL||localStorage.getItem('fas_proxy_url')||'';
+      const apiUrl=proxy?proxy+'/api/anthropic':'https://api.anthropic.com/v1/messages';
+      const headers=proxy
+        ?{'Content-Type':'application/json'}
+        :{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'};
+
+      const resp=await fetch(apiUrl,{
         method:'POST',
-        headers:{'Content-Type':'application/json','anthropic-version':'2023-06-01','x-api-key':ANTHROPIC_KEY,'anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:prompt}]})
+        headers,
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:3000,messages:[{role:'user',content:prompt}]})
       });
-      if(!resp.ok)return Sessions.basicFeedback(metrics,ag);
+
+      if(!resp.ok){
+        const errText=await resp.text();
+        console.error('AI analysis error:',resp.status,errText.slice(0,200));
+        return Sessions.basicFeedback(metrics,ag);
+      }
+
       const data=await resp.json();
-      const raw=data.content[0].text.replace(/```json|```/g,'').trim();
+      const raw=data.content?.[0]?.text?.replace(/```json|```/g,'').trim()||'';
+      if(!raw){console.error('Empty AI response');return Sessions.basicFeedback(metrics,ag);}
       return JSON.parse(raw);
-    }catch(e){return Sessions.basicFeedback(metrics,ag);}
+
+    }catch(e){
+      console.error('callAI error:',e.message);
+      return Sessions.basicFeedback(metrics,ag);
+    }
   },
 
   basicFeedback(m,ag){
