@@ -1262,72 +1262,81 @@ const Sessions={
     if(!proxy){
       if(z)z.innerHTML='<div class="upload-icon">&#10060;</div>'
         +'<p><strong>Proxy not configured.</strong><br>'
-        +'Click <strong>🔑 API Key</strong> in the top bar and enter your proxy URL to enable transcription.</p>';
-      return null;
-    }
-
-    if(file.size>200*1024*1024){
-      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div>'
-        +'<p><strong>File too large ('+sizeMB+'MB)</strong><br>Maximum is 200MB. Try trimming the recording.</p>';
+        +'Click <strong>&#128273; API Key</strong> in the top bar and enter your Vercel proxy URL.</p>';
       return null;
     }
 
     try{
-      // Step 1 — Upload audio to proxy → AssemblyAI
+      // Step 1 — Get upload auth from proxy
       if(z)z.innerHTML='<div class="upload-icon">&#8987;</div>'
-        +'<p><strong>Uploading '+file.name+'</strong> ('+sizeMB+'MB)…<br>Step 1 of 3 — uploading audio</p>';
+        +'<p><strong>Preparing upload…</strong><br>Step 1 of 3</p>';
 
-      const uploadResp=await fetch(proxy+'/api/whisper',{
+      const tokenResp=await fetch(proxy+'/api/whisper',{
         method:'POST',
-        headers:{'Content-Type':file.type||'audio/mp4','x-action':'upload'},
+        headers:{'Content-Type':'application/json','x-action':'upload-token'},
+        body:JSON.stringify({})
+      });
+      if(!tokenResp.ok){
+        const err=await tokenResp.json().catch(()=>({}));
+        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>Could not connect to proxy: '+(err.error||tokenResp.status)+'</strong><br>Check your proxy URL is correct.</p>';
+        return null;
+      }
+      const{upload_auth,upload_url}=await tokenResp.json();
+
+      // Step 2 — Upload directly to AssemblyAI (bypasses Vercel size limit)
+      if(z)z.innerHTML='<div class="upload-icon">&#8987;</div>'
+        +'<p><strong>Uploading '+file.name+'</strong> ('+sizeMB+'MB)…<br>Step 2 of 3 — uploading directly to AssemblyAI</p>';
+
+      const uploadResp=await fetch(upload_url,{
+        method:'POST',
+        headers:{
+          'authorization':upload_auth,
+          'content-type':file.type||'audio/mp4'
+        },
         body:file
       });
       if(!uploadResp.ok){
-        const err=await uploadResp.json();
-        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>Upload failed: '+(err.error||uploadResp.status)+'</strong><br>Check your proxy URL and try again.</p>';
+        const err=await uploadResp.text();
+        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>Upload failed ('+uploadResp.status+')</strong><br>'+err.slice(0,120)+'<br><br>Paste your transcript manually below.</p>';
         return null;
       }
-      const{upload_url}=await uploadResp.json();
+      const{upload_url:audioUrl}=await uploadResp.json();
 
-      // Step 2 — Submit for transcription
+      // Step 3 — Submit for transcription via proxy
       if(z)z.innerHTML='<div class="upload-icon">&#8987;</div>'
-        +'<p><strong>Transcribing…</strong><br>Step 2 of 3 — sending to AssemblyAI</p>';
+        +'<p><strong>Transcribing…</strong><br>Step 3 of 3 — AssemblyAI is processing your session (2–4 minutes)</p>';
 
       const submitResp=await fetch(proxy+'/api/whisper',{
         method:'POST',
         headers:{'Content-Type':'application/json','x-action':'submit'},
-        body:JSON.stringify({upload_url})
+        body:JSON.stringify({audio_url:audioUrl})
       });
       if(!submitResp.ok){
-        const err=await submitResp.json();
-        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>Transcription submit failed: '+(err.error||submitResp.status)+'</strong></p>';
+        const err=await submitResp.json().catch(()=>({}));
+        if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p><strong>Transcription failed: '+(err.error||submitResp.status)+'</strong><br>Paste your transcript manually below.</p>';
         return null;
       }
       const{transcript_id}=await submitResp.json();
 
-      // Step 3 — Poll until complete
-      if(z)z.innerHTML='<div class="upload-icon">&#8987;</div>'
-        +'<p><strong>Transcribing your session…</strong><br>Step 3 of 3 — this takes 2–4 minutes for a full session. Please wait.</p>';
-
+      // Step 4 — Poll until complete
       for(let i=0;i<120;i++){
-        await new Promise(r=>setTimeout(r,5000)); // poll every 5 seconds
+        await new Promise(r=>setTimeout(r,5000));
 
         const pollResp=await fetch(proxy+'/api/whisper',{
           method:'POST',
           headers:{'Content-Type':'application/json','x-action':'poll','x-transcript-id':transcript_id},
           body:JSON.stringify({})
         });
-
         if(!pollResp.ok) continue;
         const poll=await pollResp.json();
 
         if(poll.status==='completed'){
-          if(!poll.text||poll.text.trim().length<20){
+          if(!poll.text||poll.text.trim().length<10){
             if(z)z.innerHTML='<div class="upload-icon">&#9888;</div><p>Transcription returned empty text. The audio may be too quiet.<br><br>Paste your transcript manually below.</p>';
             return null;
           }
           if(z)z.innerHTML='<div class="upload-icon">&#10003;</div>'
-            +'<p><strong>'+file.name+'</strong> transcribed successfully ✓<br>Review the text below, then click Analyse Session.</p>';
+            +'<p><strong>'+file.name+'</strong> transcribed ✓<br>Review the text below then click Analyse Session.</p>';
           return poll.text.trim();
         }
 
@@ -1336,14 +1345,13 @@ const Sessions={
           return null;
         }
 
-        // Update progress message
-        const mins=Math.floor(i*5/60),secs=(i*5)%60;
+        const elapsed=Math.floor(i*5/60)+'m '+((i*5)%60)+'s';
         if(z)z.innerHTML='<div class="upload-icon">&#8987;</div>'
-          +'<p><strong>Transcribing…</strong> '+mins+'m '+secs+'s elapsed<br>'
-          +'Status: '+poll.status+'. Typically 2–4 minutes for a full session.</p>';
+          +'<p><strong>Transcribing…</strong> '+elapsed+' elapsed<br>'
+          +'AssemblyAI status: '+poll.status+'. Typically 2–4 minutes for a full session.</p>';
       }
 
-      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p>Transcription timed out. The audio may be very long.<br><br>Paste your transcript manually below.</p>';
+      if(z)z.innerHTML='<div class="upload-icon">&#10060;</div><p>Transcription timed out. Try a shorter recording or paste transcript manually.</p>';
       return null;
 
     }catch(e){
