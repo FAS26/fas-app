@@ -927,24 +927,51 @@ const App={
   },
 
   submitKey(){
-    const input=document.getElementById('apiKeyInput');
+    const proxyInput=document.getElementById('proxyUrlInput');
+    const keyInput=document.getElementById('apiKeyInput');
     const err=document.getElementById('apiKeyError');
-    const k=input?.value?.trim()||'';
-    if(!k.startsWith('sk-ant')){
-      if(err){err.textContent='That does not look like a valid Anthropic key (must start with sk-ant)';err.style.display='block';}
+
+    const proxy=(proxyInput?.value?.trim()||'').replace(/\/$/,'');
+    const k=keyInput?.value?.trim()||'';
+
+    // Must have at least one
+    if(!proxy&&!k){
+      if(err){err.textContent='Please enter your Vercel Proxy URL.';err.style.display='block';}
       return;
     }
-    saveKey(k);
-    closeModal('apiKeyModal');
+
+    // Validate key format if provided
+    if(k&&!k.startsWith('sk-ant')){
+      if(err){err.textContent='API key must start with sk-ant. Leave blank if using proxy only.';err.style.display='block';}
+      return;
+    }
+
+    // Save proxy URL
+    if(proxy){
+      PROXY_URL=proxy;
+      localStorage.setItem('fas_proxy_url',proxy);
+    }
+
+    // Save API key if provided
+    if(k){
+      ANTHROPIC_KEY=k;
+      localStorage.setItem('fas_anthropic_key',k);
+    }
+
+    // Update topbar button
+    const btn=document.getElementById('apiKeyBtn');
+    if(btn){btn.textContent='🔑 Configured';btn.style.color='var(--lime)';}
+
     if(err)err.style.display='none';
-    if(input)input.value='';
-    // Run the callback if one was set (e.g. retry email generation)
+    closeModal('apiKeyModal');
+
+    // Run any pending callback
     if(window._apiKeyCallback){
       const cb=window._apiKeyCallback;
       window._apiKeyCallback=null;
-      setTimeout(cb,100);
+      setTimeout(cb,200);
     } else {
-      alert('API key saved. AI features are now active.');
+      alert('Saved! Proxy: '+(proxy||'not set'));
     }
   },
 
