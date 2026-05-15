@@ -1520,6 +1520,8 @@ const Sessions={
     try{
       const prompt=Framework.buildAIPrompt(transcript,title,ag,metrics,isGameDay);
       const proxy=PROXY_URL||localStorage.getItem('fas_proxy_url')||'';
+      console.log('callAI: proxy=',proxy?proxy:'NONE (direct)','age=',ag);
+
       const apiUrl=proxy?proxy+'/api/anthropic':'https://api.anthropic.com/v1/messages';
       const headers=proxy
         ?{'Content-Type':'application/json'}
@@ -1528,22 +1530,59 @@ const Sessions={
       const resp=await fetch(apiUrl,{
         method:'POST',
         headers,
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:prompt}]})
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:5000,messages:[{role:'user',content:prompt}]})
       });
+
+      console.log('callAI response status:',resp.status);
 
       if(!resp.ok){
         const errText=await resp.text();
-        console.error('AI analysis error:',resp.status,errText.slice(0,200));
+        console.error('AI analysis error:',resp.status,errText.slice(0,300));
         return Sessions.basicFeedback(metrics,ag);
       }
 
       const data=await resp.json();
-      const raw=data.content?.[0]?.text?.replace(/```json|```/g,'').trim()||'';
-      if(!raw){console.error('Empty AI response');return Sessions.basicFeedback(metrics,ag);}
-      return JSON.parse(raw);
+      console.log('callAI stop_reason:',data.stop_reason,'usage:',JSON.stringify(data.usage));
+
+      const rawText=data.content?.[0]?.text||'';
+      console.log('callAI raw length:',rawText.length,'first 200:',rawText.slice(0,200));
+
+      // Try to extract JSON even if response has extra text
+      let raw=rawText.replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
+
+      // If response was cut off (stop_reason=max_tokens), try to salvage
+      if(data.stop_reason==='max_tokens'){
+        console.warn('Response cut off at max_tokens — attempting partial parse');
+        // Try to close the JSON
+        const lastBrace=raw.lastIndexOf('}');
+        if(lastBrace>0) raw=raw.slice(0,lastBrace+1);
+      }
+
+      if(!raw){
+        console.error('Empty AI response after cleaning');
+        return Sessions.basicFeedback(metrics,ag);
+      }
+
+      try{
+        const result=JSON.parse(raw);
+        console.log('callAI parse SUCCESS grade:',result.grade,'hasWellbeing:',!!result.wellbeingCheck);
+        return result;
+      }catch(parseErr){
+        console.error('JSON parse failed:',parseErr.message);
+        console.error('Raw text:',raw.slice(0,500));
+        // Try extracting just the core fields without wellbeing
+        try{
+          const coreMatch=raw.match(/\{[\s\S]*?"feedforward"\s*:\s*"[^"]*"/);
+          if(coreMatch){
+            const partial=coreMatch[0]+'}';
+            return JSON.parse(partial);
+          }
+        }catch(e2){}
+        return Sessions.basicFeedback(metrics,ag);
+      }
 
     }catch(e){
-      console.error('callAI error:',e.message);
+      console.error('callAI exception:',e.message,e.stack?.slice(0,200));
       return Sessions.basicFeedback(metrics,ag);
     }
   },
