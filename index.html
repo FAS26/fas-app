@@ -866,7 +866,15 @@ D: Generic coaching. Not position-specific. Coach-dominated. Few questions.`;
       +'    {"area": "focus1 title","action": "One concrete action for next session — '+ageGroup+' appropriate","tip": "One practical tip","why": "Why this matters for '+ageGroup+' development"},'+nl
       +'    {"area": "focus2 title","action": "One concrete action — '+ageGroup+' appropriate","tip": "One practical tip","why": "Why this matters for '+ageGroup+'"}'+nl
       +'  ],'+nl
-      +'  "feedforward": "One paragraph as Jamie McLeod — warm expert specific to this session and '+ageGroup+'. Reference: Assess, Identify Goals, Plan, Implement, Analyse, Reflect, Reassess. End with genuine encouragement."'+nl
+      +'  "feedforward": "One paragraph as Jamie McLeod — warm expert specific to this session and '+ageGroup+'. Reference: Assess, Identify Goals, Plan, Implement, Analyse, Reflect, Reassess. Weave in any wellbeing observations naturally — celebrate what the coach did well emotionally and note any concerns gently but directly.",'+nl
+      +'  "wellbeingCheck": {'+nl
+      +'    "tier": "green or yellow or amber or red",'+nl
+      +'    "summary": "1-2 sentences on the emotional safety of this session",'+nl
+      +'    "greenMoments": [{"moment": "quote from transcript", "why": "why this matters for child development", "celebrate": "specific acknowledgement of what the coach did right"}],'+nl
+      +'    "flags": [{"category": "shame or sarcasm or belittling or singling-out or conditional-worth or exasperation or identity-attack", "severity": "yellow or amber or red", "detected": "exact phrase or description from transcript", "impact": "why this harms children - cite that adult language shapes child self-concept", "alternative": "specific replacement phrase", "practice": "one micro-practice for next session"}],'+nl
+      +'    "directorFlag": false,'+nl
+      +'    "directorNote": "for amber or red only: what director needs to know professionally"'+nl
+      +'  }'+nl
       +'}';
   },
 
@@ -1520,7 +1528,7 @@ const Sessions={
       const resp=await fetch(apiUrl,{
         method:'POST',
         headers,
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:3000,messages:[{role:'user',content:prompt}]})
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:prompt}]})
       });
 
       if(!resp.ok){
@@ -1691,6 +1699,7 @@ const Sessions={
           <div class="ff-header"><h2>${s.title||'Session Feedforward'}</h2><p style="font-size:12px;color:var(--text-muted)">${s.date||''} · ${s.age_group||''} · ${ctx.phase} · Grade: ${s.grade||'—'}${s.profile_label?' · '+s.profile_label:''}</p></div>
           ${s.encouragement?`<div class="ff-section"><h3>What You Did Well</h3><p>${s.encouragement}</p></div>`:''}
           ${s.focus_cue_title?'<div class="ff-section"><h3>Focus for Next Session</h3><p><strong>'+s.focus_cue_title+'</strong></p>'+(s.focus_cue_why?'<p>'+s.focus_cue_why+'</p>':'')+'</div>':''}
+          ${(()=>{try{const wb=s.wellbeing_check?JSON.parse(s.wellbeing_check):{};const greens=(wb.greenMoments||[]);const flags=(wb.flags||[]);if(!greens.length&&!flags.length)return'';let html='<div class="ff-section"><h3>Wellbeing Observations</h3>';if(greens.length)html+='<p><strong>&#127775; Caught being good:</strong> '+greens.map(g=>g.celebrate).join(' ')+'</p>';if(flags.length)html+='<p><strong>Worth reflecting on:</strong> '+flags.map(f=>f.detected+' — '+f.alternative).join(' ')+'</p>';return html+'</div>';}catch(e){return'';}})()}
           ${s.ai_feedforward?'<div class="ff-section"><h3>Full Feedforward</h3><div class="ff-tip">'+s.ai_feedforward.replace(/\n/g,'<br>')+'</div></div>':''}
         </div>
       </div>
