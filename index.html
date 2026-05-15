@@ -822,7 +822,14 @@ D: Generic coaching. Not position-specific. Coach-dominated. Few questions.`;
       +'4. NEVER mention high-order questions as a concern for U6/U7/U8'+nl
       +'5. NEVER suggest freeze moments for U6/U7/U8'+nl
       +'6. If the coach used visual metaphors, name them specifically and praise them'+nl
-      +'7. The profile label should describe this coach in this session accurately'+nl+nl
+      +'7. The profile label should describe this coach in this session accurately'+nl
+      +'8. WELLBEING CHECK — scan the transcript for these emotional safety patterns:'+nl
+      +'   GREEN (catch the coach being good): recovering from correction with praise, acknowledging child frustration with empathy, using a child\'s name with warmth after difficulty, reframing mistakes as learning, checking in with a struggling child'+nl
+      +'   YELLOW (1-2 instances, frustration-based not identity-based): one exasperation moment, one sarcasm that may have landed poorly, corrections with no praise recovery'+nl
+      +'   AMBER (3+ instances in session, or language directed at child not situation): repeated belittling, multiple corrections without praise, consistent sarcasm'+nl
+      +'   RED (any instance of identity attack, public humiliation, body-shaming, threatening language, or severe sarcasm to a child who did not understand it as humour)'+nl
+      +'   Set directorFlag to true for amber and red. For red, directorNote must include the specific language.'+nl
+      +'   Always look for green moments first — celebrate what the coach is doing right before addressing concerns.'+nl+nl
       +'Respond ONLY with valid JSON — no preamble, no backticks, no markdown:'+nl
       +'{'+nl
       +'  "grade": "A|B|C|D",'+nl
@@ -1173,7 +1180,7 @@ const Nav={
       sessions:[{id:'new',label:'New Session',icon:'➕'},{id:'list',label:'All Sessions',icon:'📋'}],
       gameday:[{id:'new',label:'New Game Report',icon:'➕'},{id:'list',label:'Game Reports',icon:'🏆'}],
       team:[{id:'roadmap',label:'Roadmap',icon:'🗺️'},{id:'emails',label:'Weekly Emails',icon:'📧'},{id:'players',label:'Players',icon:'👤'},{id:'roster',label:'Team',icon:'⚽'}],
-      journey:[{id:'bamboo',label:'Bamboo Within',icon:'🌿'},{id:'improve',label:'Areas to Improve',icon:'📈'},{id:'progress',label:'Progress Tracker',icon:'📊'}],
+      journey:[{id:'bamboo',label:'Bamboo Within',icon:'🌿'},{id:'improve',label:'Areas to Improve',icon:'📈'},{id:'progress',label:'Progress Tracker',icon:'📊'},{id:'wellbeing',label:'Wellbeing History',icon:'💚'}],
     };
     const list=items[section]||[];
     if(!list.length){el.innerHTML='';return;}
@@ -1459,6 +1466,7 @@ const Sessions={
       planning:aiResult.planning?JSON.stringify(aiResult.planning):'',
       organisation:aiResult.organisation?JSON.stringify(aiResult.organisation):'',
       coaching_interactions:aiResult.coachingInteractions?JSON.stringify(aiResult.coachingInteractions):'',
+      wellbeing_check:aiResult.wellbeingCheck?JSON.stringify(aiResult.wellbeingCheck):'',
     }).select().single();
     if(error){alert('Error saving: '+error.message);$('ns-processing').style.display='none';return;}
     State.sessions.unshift(session);
@@ -1675,6 +1683,8 @@ const Sessions={
         <button class="btn btn-primary btn-sm" onclick="Sessions.saveReflection('${esc(id)}')">Save Reflection</button>
       </div>
 
+      ${Sessions.buildWellbeingCard(s)}
+
       <div class="card">
         <div class="card-header"><div class="card-title">Written Feedforward — Jamie McLeod</div><button class="btn btn-sm btn-dark" onclick="Sessions.exportFF('${esc(id)}')">Export / Print</button></div>
         <div class="feedforward-doc">
@@ -1689,6 +1699,79 @@ const Sessions={
     setTimeout(()=>Sessions.drawCharts(s),80);
   },
 
+
+  buildWellbeingCard(s){
+    if(!s.wellbeing_check)return '';
+    let wb;
+    try{wb=typeof s.wellbeing_check==='string'?JSON.parse(s.wellbeing_check):s.wellbeing_check;}
+    catch(e){return '';}
+    if(!wb)return '';
+
+    const tier=wb.tier||'green';
+    const tierConfig={
+      green:{bg:'#f0fdf4',border:'#16a34a',color:'#15803d',icon:'&#127775;',label:'Emotionally Safe Session'},
+      yellow:{bg:'#fefce8',border:'#ca8a04',color:'#a16207',icon:'&#128993;',label:'Worth Reflecting On'},
+      amber:{bg:'#fff7ed',border:'#ea580c',color:'#c2410c',icon:'&#128992;',label:'Developing Pattern — Take Note'},
+      red:{bg:'#fef2f2',border:'#dc2626',color:'#b91c1c',icon:'&#128308;',label:'Immediate Concern'},
+    };
+    const tc=tierConfig[tier]||tierConfig.green;
+
+    const greens=(wb.greenMoments||[]).map(g=>
+      '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #16a34a;border-radius:8px;padding:12px 14px;margin-bottom:10px">'
+        +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#15803d;margin-bottom:6px">&#127775; Caught Being Good</div>'
+        +'<div style="font-size:13px;font-style:italic;color:#374151;margin-bottom:6px">"'+g.moment+'"</div>'
+        +'<div style="font-size:12px;color:#15803d;font-weight:600;margin-bottom:4px">'+g.celebrate+'</div>'
+        +'<div style="font-size:12px;color:#6b7280;line-height:1.6">'+g.why+'</div>'
+      +'</div>'
+    ).join('');
+
+    const severityLabel={yellow:'&#128993; Worth Reflecting On',amber:'&#128992; Worth Addressing',red:'&#128308; Immediate Concern'};
+    const flags=(wb.flags||[]).map(f=>
+      '<div style="background:#fff;border:1px solid #e5e7eb;border-left:4px solid '+(f.severity==='red'?'#dc2626':f.severity==='amber'?'#ea580c':'#ca8a04')+';border-radius:8px;padding:14px;margin-bottom:10px">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+          +'<span style="font-size:12px;font-weight:700;color:'+(f.severity==='red'?'#dc2626':f.severity==='amber'?'#ea580c':'#a16207')+'">'+(severityLabel[f.severity]||'')+'</span>'
+          +'<span style="font-size:11px;background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:0.3px">'+f.category+'</span>'
+        +'</div>'
+        +'<div style="font-size:13px;font-style:italic;color:#374151;margin-bottom:8px;padding:8px 12px;background:#f9fafb;border-radius:6px">"'+f.detected+'"</div>'
+        +'<div style="font-size:12px;color:#374151;line-height:1.6;margin-bottom:8px"><strong>Why this matters:</strong> '+f.impact+'</div>'
+        +'<div style="background:#f0fdf4;border-radius:6px;padding:10px 12px;margin-bottom:8px">'
+          +'<div style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:4px">TRY THIS INSTEAD</div>'
+          +'<div style="font-size:13px;color:#14532d;font-style:italic">"'+f.alternative+'"</div>'
+        +'</div>'
+        +'<div style="background:#eff6ff;border-radius:6px;padding:10px 12px">'
+          +'<div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:4px">MICRO-PRACTICE FOR NEXT SESSION</div>'
+          +'<div style="font-size:12px;color:#1e40af">'+f.practice+'</div>'
+        +'</div>'
+      +'</div>'
+    ).join('');
+
+    const resourcesHtml='<div style="margin-top:14px;padding-top:12px;border-top:1px solid #e5e7eb">'
+      +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#6b7280;margin-bottom:8px">Grounded In</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:8px">'
+        +'<a href="https://projectplay.org/childrens-rights-and-sports" target="_blank" style="font-size:11px;color:#2563eb;text-decoration:none;background:#eff6ff;padding:3px 10px;border-radius:100px">Children\'s Bill of Rights in Sport &#8599;</a>'
+        +'<a href="https://www.kidsmentalhealthfoundation.org/mental-health-resources/teachers-and-coaches" target="_blank" style="font-size:11px;color:#2563eb;text-decoration:none;background:#eff6ff;padding:3px 10px;border-radius:100px">Kids Mental Health Foundation &#8599;</a>'
+        +'<a href="https://headstart.gov/mental-health/article/understanding-managing-childrens-behaviors" target="_blank" style="font-size:11px;color:#2563eb;text-decoration:none;background:#eff6ff;padding:3px 10px;border-radius:100px">Head Start — Child Behaviour &#8599;</a>'
+      +'</div>'
+    +'</div>';
+
+    return '<div class="card" style="margin-bottom:12px;border:2px solid '+tc.border+';background:'+tc.bg+'">'
+      +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid '+tc.border+'">'
+        +'<div style="font-size:28px">'+tc.icon+'</div>'
+        +'<div>'
+          +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:'+tc.color+'">Wellbeing Check</div>'
+          +'<div style="font-size:16px;font-weight:700;color:#1a1a1a">'+tc.label+'</div>'
+        +'</div>'
+      +'</div>'
+      +(wb.summary?'<div style="font-size:13px;color:#374151;line-height:1.7;margin-bottom:14px;font-style:italic">'+wb.summary+'</div>':'')
+      +'<div style="font-size:12px;color:#6b7280;line-height:1.7;margin-bottom:14px;background:#fff;border-radius:8px;padding:12px 14px">'
+        +'"The way we speak to young athletes shapes how they see themselves — not just in sport, but far beyond it. This is a private mirror, not a judgement. The moments below are worth sitting with."'
+      +'</div>'
+      +(greens||'')
+      +(flags||'')
+      +((wb.flags||[]).length===0&&(wb.greenMoments||[]).length===0?'<div style="font-size:13px;color:#6b7280;text-align:center;padding:12px 0">No specific moments detected — keep doing what you\'re doing.</div>':'')
+      +resourcesHtml
+      +'</div>';
+  },
 
   toggleFullReport(id){
     const el=document.getElementById('fullReport-'+id);
@@ -3254,6 +3337,7 @@ const Journey={
     if(!sub||sub==='bamboo')Journey.renderBamboo();
     else if(sub==='improve')Journey.renderImprove();
     else if(sub==='progress')Journey.renderProgress();
+    else if(sub==='wellbeing')Journey.renderWellbeing();
   },
 
   QS:[
@@ -3283,6 +3367,127 @@ const Journey={
     {id:'q24',week:12,theme:'Getting Out of Your Own Way',prompt:'What do I need to do to get out of my own way? Who has a negative impact on my life?',depth:'Every coach has internal and external obstacles to their own growth.',follow:'What is the single most important thing to address first?'},
     {id:'q25',week:13,theme:'Season Reflection',prompt:'What changes am I witnessing in myself across this whole season of growth?',depth:'You began this journey answering questions about who you are. Return now with fresh eyes.',follow:'Which question challenged you most? Which answer surprised you most?'},
   ],
+
+  renderWellbeing(){
+    State.currentSubSection='wellbeing';
+    const sessions=State.sessions.filter(s=>s.wellbeing_check);
+
+    // Parse all wellbeing checks
+    const all=sessions.map(s=>{
+      try{return{...s,wb:typeof s.wellbeing_check==='string'?JSON.parse(s.wellbeing_check):s.wellbeing_check};}
+      catch(e){return null;}
+    }).filter(Boolean);
+
+    // Aggregate stats
+    const greens=all.reduce((a,s)=>a+(s.wb.greenMoments||[]).length,0);
+    const yellows=all.reduce((a,s)=>a+(s.wb.flags||[]).filter(f=>f.severity==='yellow').length,0);
+    const ambers=all.reduce((a,s)=>a+(s.wb.flags||[]).filter(f=>f.severity==='amber').length,0);
+    const reds=all.reduce((a,s)=>a+(s.wb.flags||[]).filter(f=>f.severity==='red').length,0);
+
+    // Tier distribution
+    const tierCount={green:0,yellow:0,amber:0,red:0};
+    all.forEach(s=>{if(s.wb.tier)tierCount[s.wb.tier]=(tierCount[s.wb.tier]||0)+1;});
+
+    const tierBar=(tier,count,total,color,label)=>{
+      const pct=total?Math.round(count/total*100):0;
+      return '<div style="margin-bottom:10px">'
+        +'<div style="display:flex;justify-content:space-between;margin-bottom:4px">'
+          +'<span style="font-size:12px;font-weight:600;color:'+color+'">'+label+'</span>'
+          +'<span style="font-size:12px;color:#6b7280">'+count+' session'+(count!==1?'s':'')+'</span>'
+        +'</div>'
+        +'<div style="height:8px;background:#f3f4f6;border-radius:4px;overflow:hidden">'
+          +'<div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px;transition:width 0.4s"></div>'
+        +'</div>'
+      +'</div>';
+    };
+
+    const total=all.length;
+
+    setMain('<div class="page-header"><div><h1>Wellbeing History</h1><p>Your emotional safety record across '+total+' session'+(total!==1?'s':'')+' — private to you</p></div></div>'
+      +'<div class="page-body">'
+
+      // Private mirror intro
+      +'<div style="background:#1a1a2e;border:1px solid #16a34a;border-radius:12px;padding:18px 20px;margin-bottom:20px">'
+        +'<div style="font-size:14px;color:#dcfce7;line-height:1.8;font-style:italic">'
+          +'"The way we speak to young athletes shapes how they see themselves — not just in sport, but far beyond it. This history is a private mirror, not a judgement. It exists to help you grow into the coach your players deserve."'
+        +'</div>'
+      +'</div>'
+
+      // Summary stats
+      +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">'
+        +'<div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:12px;padding:14px;text-align:center">'
+          +'<div style="font-size:28px;font-weight:800;color:#15803d">'+greens+'</div>'
+          +'<div style="font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.4px">Green Moments</div>'
+          +'<div style="font-size:11px;color:#6b7280;margin-top:2px">Caught being good</div>'
+        +'</div>'
+        +'<div style="background:#fefce8;border:2px solid #ca8a04;border-radius:12px;padding:14px;text-align:center">'
+          +'<div style="font-size:28px;font-weight:800;color:#a16207">'+yellows+'</div>'
+          +'<div style="font-size:11px;font-weight:700;color:#a16207;text-transform:uppercase;letter-spacing:0.4px">Yellow Flags</div>'
+          +'<div style="font-size:11px;color:#6b7280;margin-top:2px">Worth reflecting on</div>'
+        +'</div>'
+        +'<div style="background:#fff7ed;border:2px solid #ea580c;border-radius:12px;padding:14px;text-align:center">'
+          +'<div style="font-size:28px;font-weight:800;color:#c2410c">'+ambers+'</div>'
+          +'<div style="font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;letter-spacing:0.4px">Amber Flags</div>'
+          +'<div style="font-size:11px;color:#6b7280;margin-top:2px">Developing patterns</div>'
+        +'</div>'
+        +'<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:12px;padding:14px;text-align:center">'
+          +'<div style="font-size:28px;font-weight:800;color:#b91c1c">'+reds+'</div>'
+          +'<div style="font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.4px">Red Flags</div>'
+          +'<div style="font-size:11px;color:#6b7280;margin-top:2px">Immediate concern</div>'
+        +'</div>'
+      +'</div>'
+
+      // Session tier distribution
+      +'<div class="card" style="margin-bottom:16px">'
+        +'<div class="card-title">Session Breakdown</div>'
+        +tierBar("green",tierCount.green,total,'#16a34a','&#127775; Emotionally Safe')
+        +tierBar("yellow",tierCount.yellow,total,'#ca8a04','&#128993; Worth Reflecting On')
+        +tierBar("amber",tierCount.amber,total,'#ea580c','&#128992; Developing Pattern')
+        +tierBar("red",tierCount.red,total,'#dc2626','&#128308; Immediate Concern')
+      +'</div>'
+
+      // Celebration section - all green moments
+      +(greens>0?'<div class="card" style="margin-bottom:16px;border-left:4px solid #16a34a">'
+        +'<div style="font-size:14px;font-weight:700;color:#15803d;margin-bottom:14px">&#127775; Moments to Celebrate — You Got This Right</div>'
+        +all.flatMap(s=>(s.wb.greenMoments||[]).map(g=>
+          '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;margin-bottom:10px">'
+            +'<div style="font-size:11px;color:#6b7280;margin-bottom:4px">'+s.date+' · '+s.age_group+'</div>'
+            +'<div style="font-size:13px;font-style:italic;color:#374151;margin-bottom:6px">"'+g.moment+'"</div>'
+            +'<div style="font-size:12px;color:#15803d;font-weight:600">'+g.celebrate+'</div>'
+          +'</div>'
+        )).join('')
+        +'</div>':'')
+
+      // Red flags history - persistent record
+      +(reds>0?'<div class="card" style="margin-bottom:16px;border-left:4px solid #dc2626">'
+        +'<div style="font-size:14px;font-weight:700;color:#b91c1c;margin-bottom:6px">&#128308; Red Flag Record</div>'
+        +'<div style="font-size:12px;color:#6b7280;margin-bottom:14px;line-height:1.6">These moments are recorded permanently as a safeguarding record. They are also visible to your director. Each one is an opportunity to do things differently.</div>'
+        +all.flatMap(s=>(s.wb.flags||[]).filter(f=>f.severity==='red').map(f=>
+          '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px;margin-bottom:10px">'
+            +'<div style="font-size:11px;color:#6b7280;margin-bottom:4px">'+s.date+' · '+s.age_group+' · '+f.category+'</div>'
+            +'<div style="font-size:13px;font-style:italic;color:#374151;margin-bottom:8px">"'+f.detected+'"</div>'
+            +'<div style="background:#fff;border-radius:6px;padding:8px 12px;margin-bottom:6px">'
+              +'<div style="font-size:11px;font-weight:700;color:#15803d;margin-bottom:3px">TRY INSTEAD</div>'
+              +'<div style="font-size:12px;color:#14532d;font-style:italic">"'+f.alternative+'"</div>'
+            +'</div>'
+            +'<div style="font-size:12px;color:#1e40af;background:#eff6ff;border-radius:6px;padding:8px 12px">'+f.practice+'</div>'
+          +'</div>'
+        )).join('')
+        +'</div>':'')
+
+      +(!total?'<div class="empty"><div class="empty-icon">&#128154;</div><h3>No wellbeing data yet</h3><p>Upload and analyse sessions to build your wellbeing history. Every session is a chance to grow.</p></div>':'')
+
+      // Resources
+      +'<div class="card">'
+        +'<div class="card-title">Resources</div>'
+        +'<div style="display:flex;flex-direction:column;gap:8px">'
+          +'<a href="https://projectplay.org/childrens-rights-and-sports" target="_blank" style="color:#2563eb;font-size:13px;text-decoration:none">Children\'s Bill of Rights in Sport &#8599;</a>'
+          +'<a href="https://www.kidsmentalhealthfoundation.org/mental-health-resources/teachers-and-coaches" target="_blank" style="color:#2563eb;font-size:13px;text-decoration:none">Kids Mental Health Foundation — Coaches &#8599;</a>'
+          +'<a href="https://headstart.gov/mental-health/article/understanding-managing-childrens-behaviors" target="_blank" style="color:#2563eb;font-size:13px;text-decoration:none">Head Start — Understanding Children\'s Behaviour &#8599;</a>'
+        +'</div>'
+      +'</div>'
+      +'</div>');
+  },
 
   renderBamboo(){
     State.currentSubSection='bamboo';
@@ -3517,6 +3722,8 @@ const Director={
       const cs=allSessions.filter(s=>s.user_id===coach.id);
       const training=cs.filter(s=>!s.session_objective?.startsWith('GAMEDAY'));
       const avgQI=training.length?training.reduce((a,s)=>a+parseFloat(s.qi_ratio||0),0)/training.length:0;
+    const redFlags=training.filter(s=>{try{const wb=s.wellbeing_check?JSON.parse(s.wellbeing_check):{};return wb.tier==='red'||(wb.flags||[]).some(f=>f.severity==='red');}catch(e){return false;}}).length;
+    const amberFlags=training.filter(s=>{try{const wb=s.wellbeing_check?JSON.parse(s.wellbeing_check):{};return wb.tier==='amber'||(wb.flags||[]).some(f=>f.severity==='amber');}catch(e){return false;}}).length;
       const lastUp=cs[0];
       const daysSince=lastUp?Math.floor((new Date()-new Date(lastUp.created_at))/(1000*60*60*24)):999;
       const roadmapDone=(allRoadmaps.filter(r=>r.user_id===coach.id&&r.checked)).length;
@@ -3555,6 +3762,8 @@ const Director={
           </div>
           <div style="display:flex;gap:6px;align-items:center">
             <div style="width:14px;height:38px;border-radius:3px;background:${daysSinceContact<=7?'#22c55e':daysSinceContact<=14?'#f59e0b':'#ef4444'};opacity:.85"></div>
+            ${redFlags>0?`<span style="background:#fee2e2;color:#b91c1c;font-size:11px;font-weight:700;padding:2px 8px;border-radius:100px">🔴 ${redFlags} Red</span>`:''}
+            ${amberFlags>0&&!redFlags?`<span style="background:#ffedd5;color:#c2410c;font-size:11px;font-weight:700;padding:2px 8px;border-radius:100px">🟠 ${amberFlags} Amber</span>`:''}
             <div class="grade ${Sessions.gc(latestGrade)}" style="width:30px;height:30px;font-size:13px">${latestGrade}</div>
             <span style="font-size:11px;color:var(--lime);font-weight:600">View →</span>
           </div>
@@ -3583,6 +3792,8 @@ const Director={
 
     // Top strengths — from encouragement text
     const avgQI=training.length?training.reduce((a,s)=>a+parseFloat(s.qi_ratio||0),0)/training.length:0;
+    const redFlags=training.filter(s=>{try{const wb=s.wellbeing_check?JSON.parse(s.wellbeing_check):{};return wb.tier==='red'||(wb.flags||[]).some(f=>f.severity==='red');}catch(e){return false;}}).length;
+    const amberFlags=training.filter(s=>{try{const wb=s.wellbeing_check?JSON.parse(s.wellbeing_check):{};return wb.tier==='amber'||(wb.flags||[]).some(f=>f.severity==='amber');}catch(e){return false;}}).length;
     const avgPC=training.length?training.reduce((a,s)=>a+parseFloat(s.pc_ratio||0),0)/training.length:0;
     const avgHQ=training.length?training.reduce((a,s)=>a+parseInt(s.high_order_q||0),0)/training.length:0;
     const roadmapDone=(roadmap||[]).filter(r=>r.checked);
