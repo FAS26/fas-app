@@ -951,9 +951,17 @@ const App={
   manageKey(){
     const currentProxy=localStorage.getItem('fas_proxy_url')||'';
     const currentKey=localStorage.getItem('fas_anthropic_key')||'';
+    // Pre-fill the fields then open
+    const proxyField=document.getElementById('proxyUrlInput');
+    const keyField=document.getElementById('apiKeyInput');
+    if(proxyField)proxyField.value=currentProxy;
+    if(keyField)keyField.value=currentKey;
+    openModal('apiKeyModal');
+  },
+
+  _old_manageKey_unused(){
     const el=document.getElementById('apiKeyModal');
     if(!el)return;
-    // Update modal to include proxy URL field
     el.querySelector('.modal-content').innerHTML='<div class="modal-body">'
       +'<h3 style="margin-bottom:14px">🔑 API Configuration</h3>'
       +'<p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">Enter your Vercel proxy URL and Anthropic key. Both are stored only in this browser.</p>'
@@ -4147,22 +4155,25 @@ if('serviceWorker' in navigator){
 <!-- API KEY MODAL -->
 <div class="modal-bg" id="apiKeyModal">
   <div class="modal" style="max-width:480px">
-    <div class="modal-title">🔑 Add Your API Key</div>
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">
-      FAS uses the Anthropic API for session analysis and email generation.
-      Your key is stored only in this browser — it is never uploaded or shared.
-    </p>
-    <div class="form-group">
-      <label class="label">Anthropic API Key</label>
-      <input type="password" id="apiKeyInput" class="input" placeholder="sk-ant-api03-..." autocomplete="off">
-      <div style="font-size:11px;color:var(--text-muted);margin-top:6px">
-        Get your key at <strong>console.anthropic.com</strong> → Settings → API Keys → Create Key
+    <div class="modal-content">
+      <div class="modal-title">🔑 API Configuration</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;line-height:1.6">
+        Enter your Vercel proxy URL to enable AI features. Your settings are stored only in this browser.
+      </p>
+      <div class="form-group">
+        <label class="label">Vercel Proxy URL</label>
+        <input type="text" id="proxyUrlInput" class="input" placeholder="https://fas-proxy.vercel.app" autocomplete="off">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:5px">Your Vercel deployment URL — enables transcription and all AI features</div>
       </div>
-    </div>
-    <div id="apiKeyError" style="display:none;color:var(--red);font-size:12px;margin-bottom:8px"></div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('apiKeyModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="App.submitKey()">Save Key & Continue</button>
+      <div class="form-group">
+        <label class="label">Anthropic API Key <span style="color:var(--text-muted);font-weight:400;font-size:11px">optional if using proxy</span></label>
+        <input type="password" id="apiKeyInput" class="input" placeholder="sk-ant-api03-..." autocomplete="off">
+      </div>
+      <div id="apiKeyError" style="display:none;color:var(--red);font-size:12px;margin-bottom:8px"></div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('apiKeyModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="App.submitKey()">Save & Continue</button>
+      </div>
     </div>
   </div>
 </div>
