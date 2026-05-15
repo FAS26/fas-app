@@ -805,7 +805,11 @@ Respond ONLY with valid JSON — no preamble, no backticks, no markdown:
       "why": "Why this matters for ${ageGroup}"
     }
   ],
-  "feedforward": "One paragraph in the voice of Jamie McLeod — warm, expert, specific to this session and ${ageGroup}. Reference: Assess, Identify Goal and Objectives, Plan, Implement, Analyse and Reflect, Reassess. End with genuine encouragement."
+  "feedforward": "One paragraph in the voice of Jamie McLeod — warm, expert, specific to this session and ${ageGroup}. Reference: Assess, Identify Goal and Objectives, Plan, Implement, Analyse and Reflect, Reassess. End with genuine encouragement.",
+  "profileLabel": "One of: Game-Aware Communicator | Player-Centred Coach | Game-Aware, Building Player Voice | Direction-Heavy, Tactically Sharp | Encouraging Presence, Developing Structure | Question-Led Developer | Positive Coach, Deepening Tactical Understanding — pick the single best fit for this coach in this session",
+  "focusCueTitle": "Short imperative title for the one thing to work on next session — e.g. Replace instructions with discovery questions during play",
+  "focusCueWhy": "1-2 sentences diagnosing why this is the priority, citing specific moments from the transcript",
+  "focusCueQuote": "An exact phrase the coach could say next session to put this into practice"
 }`;
   },
 };
@@ -1396,6 +1400,10 @@ const Sessions={
       encouragement:aiResult.encouragement||'',
       focus_area_1:aiResult.focus1||'',focus_area_2:aiResult.focus2||'',
       ai_feedforward:aiResult.feedforward||'',
+      profile_label:aiResult.profileLabel||'',
+      focus_cue_title:aiResult.focusCueTitle||'',
+      focus_cue_why:aiResult.focusCueWhy||'',
+      focus_cue_quote:aiResult.focusCueQuote||'',
       actions:JSON.stringify(aiResult.actions||[]),
       planning:aiResult.planning?JSON.stringify(aiResult.planning):'',
       organisation:aiResult.organisation?JSON.stringify(aiResult.organisation):'',
@@ -1489,6 +1497,68 @@ const Sessions={
     State.currentSession=s;
     const actions=typeof s.actions==='string'&&s.actions.startsWith('[')?JSON.parse(s.actions):[];
     const ctx=Framework.getAgeContext(s.age_group);
+    const n=ageNum(s.age_group||'U10');
+
+    // ── TOP 5 COACH CARD METRICS ──────────────────────────────────────────
+    // Benchmarks per age group
+    const benchmarks={
+      qi:{target:ctx.targets.qi,label:'Q:I Ratio',value:parseFloat(s.qi_ratio||0),tip:'Questions to Instructions — target: '+ctx.targets.qi},
+      pc:{target:3,label:'P:C Ratio',value:parseFloat(s.pc_ratio||0),tip:'Praise to Corrections — target: 3:1 minimum'},
+      hq:{target:ctx.targets.hq,label:'Discovery Questions',value:parseInt(s.high_order_q||0),tip:'High-order questions per session — target: '+ctx.targets.hq},
+      freeze:{target:ctx.targets.freeze,label:'Freeze Moments',value:parseInt(s.freeze_moment||0),tip:'Planned teaching stoppages — target: '+ctx.targets.freeze},
+      praise:{target:5,label:'Positive Moments',value:parseInt(s.individual_praise||0)+(parseInt(s.positive_reinforcement||0)),tip:'Individual praise + reinforcement combined'},
+    };
+
+    const cardColor=(val,target,isZeroOk)=>{
+      if(isZeroOk&&target===0)return'#15803d';
+      if(target===0)return'#6b7280';
+      const ratio=val/target;
+      if(ratio>=0.85)return'#15803d';
+      if(ratio>=0.5)return'#d97706';
+      return'#dc2626';
+    };
+    const cardBg=(val,target,isZeroOk)=>{
+      if(isZeroOk&&target===0)return'#f0fdf4';
+      if(target===0)return'#f9fafb';
+      const ratio=val/target;
+      if(ratio>=0.85)return'#f0fdf4';
+      if(ratio>=0.5)return'#fefce8';
+      return'#fef2f2';
+    };
+
+    const metricCard=(key,bm)=>{
+      const isZeroOk=n<=7&&key==='freeze';
+      const col=cardColor(bm.value,bm.target,isZeroOk);
+      const bg=cardBg(bm.value,bm.target,isZeroOk);
+      const status=bm.target===0?'n/a':bm.value>=bm.target*0.85?'On Target':bm.value>=bm.target*0.5?'Developing':'Needs Focus';
+      return '<div style="background:'+bg+';border:2px solid '+col+';border-radius:12px;padding:14px;text-align:center;position:relative">'
+        +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:'+col+';margin-bottom:6px">'+bm.label+'</div>'
+        +'<div style="font-size:32px;font-weight:800;color:'+col+';line-height:1;margin-bottom:6px">'+bm.value+'</div>'
+        +'<div style="font-size:11px;color:#6b7280;margin-bottom:6px">Target: '+bm.target+'</div>'
+        +'<div style="display:inline-block;background:'+col+';color:#fff;border-radius:100px;padding:2px 10px;font-size:10px;font-weight:700">'+status+'</div>'
+        +'<div style="font-size:10px;color:#9ca3af;margin-top:6px;line-height:1.4">'+bm.tip+'</div>'
+        +'</div>';
+    };
+
+    const coachCards='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px">'
+      +Object.entries(benchmarks).map(([k,bm])=>metricCard(k,bm)).join('')
+      +'</div>';
+
+    // ── PROFILE LABEL ─────────────────────────────────────────────────────
+    const profileHtml=s.profile_label?'<div style="background:var(--dark);border:1px solid var(--lime);border-radius:12px;padding:14px 18px;margin-bottom:12px;display:flex;align-items:center;gap:14px">'
+      +'<div style="font-size:28px">&#127775;</div>'
+      +'<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--lime);margin-bottom:4px">Coach Profile</div>'
+      +'<div style="font-size:16px;font-weight:700;color:#ffffff">'+s.profile_label+'</div></div>'
+      +'</div>':'';
+
+    // ── FOCUS CUE ─────────────────────────────────────────────────────────
+    const focusCueHtml=(s.focus_cue_title||s.focus_area_1)?
+      '<div style="background:#fefce8;border:2px solid #fbbf24;border-radius:12px;padding:16px 18px;margin-bottom:12px">'
+      +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:#d97706;margin-bottom:8px">&#127919; Focus for Next Session</div>'
+      +'<div style="font-size:15px;font-weight:700;color:#1a1a1a;margin-bottom:6px">'+(s.focus_cue_title||s.focus_area_1||'')+'</div>'
+      +(s.focus_cue_why?'<div style="font-size:13px;color:#374151;line-height:1.6;margin-bottom:10px">'+s.focus_cue_why+'</div>':'')
+      +(s.focus_cue_quote?'<div style="background:#fff;border-left:4px solid #fbbf24;padding:10px 14px;border-radius:0 8px 8px 0;font-size:13px;color:#374151;font-style:italic">&#8220;'+s.focus_cue_quote+'&#8221;</div>':'')
+      +'</div>':'';
 
     setMain(`
     <div class="page-header">
@@ -1505,57 +1575,22 @@ const Sessions={
     </div>
     <div class="page-body">
 
-      ${s.encouragement?`<div class="alert alert-success" style="margin-bottom:12px;line-height:1.7">${s.encouragement}</div>`:''}
+      ${s.encouragement?`<div class="alert alert-success" style="margin-bottom:12px;line-height:1.7;font-size:14px">${s.encouragement}</div>`:''}
 
-      ${s.gameMoment||s.objectiveAlignment?`<div class="card" style="margin-bottom:12px">
-        <div class="card-title">Session Alignment</div>
-        ${s.gameMoment?`<div style="margin-bottom:8px"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted)">Game Moment: </span><span style="font-size:13px;font-weight:600;color:var(--dark)">${s.gameMoment}</span></div>`:''}
-        ${s.objectiveAlignment?`<div style="font-size:13px;color:var(--text-muted)">${s.objectiveAlignment}</div>`:''}
-        ${s.licenseArea1||s.licenseArea2||s.licenseArea3?`<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-          ${s.licenseArea1?`<div style="background:var(--lime-pale);border-radius:var(--radius-xs);padding:8px 10px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#15803d;margin-bottom:3px">Planning</div><div style="font-size:11px;color:var(--text-muted)">${s.licenseArea1}</div></div>`:''}
-          ${s.licenseArea2?`<div style="background:var(--lime-pale);border-radius:var(--radius-xs);padding:8px 10px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#15803d;margin-bottom:3px">Organisation</div><div style="font-size:11px;color:var(--text-muted)">${s.licenseArea2}</div></div>`:''}
-          ${s.licenseArea3?`<div style="background:var(--lime-pale);border-radius:var(--radius-xs);padding:8px 10px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#15803d;margin-bottom:3px">Coaching</div><div style="font-size:11px;color:var(--text-muted)">${s.licenseArea3}</div></div>`:''}
-        </div>`:''}
-      </div>`:''}
+      ${profileHtml}
 
-      <div class="grid-4" style="margin-bottom:12px">
-        <div class="metric-card"><div class="metric-label">Q:I Ratio</div><div class="metric-value" style="color:${parseFloat(s.qi_ratio)>=ctx.targets.qi?'var(--lime)':'#fbbf24'}">${fmt(s.qi_ratio)}</div><div class="metric-sub">Target ${ctx.qiLabel||'≥0.5'}</div></div>
-        <div class="metric-card"><div class="metric-label">P:C Ratio</div><div class="metric-value" style="color:${parseFloat(s.pc_ratio)>=3?'var(--lime)':'#fbbf24'}">${fmt(s.pc_ratio)}</div><div class="metric-sub">Target ≥ 3:1</div></div>
-        <div class="metric-card"><div class="metric-label">High-Order Q</div><div class="metric-value">${s.high_order_q||0}</div><div class="metric-sub">of ${(s.high_order_q||0)+(s.low_order_q||0)} total</div></div>
-        <div class="metric-card"><div class="metric-label">Freeze Moments</div><div class="metric-value">${s.freeze_moment||0}</div><div class="metric-sub">Planned stops</div></div>
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:10px">Coach Card — Session Metrics vs Age Benchmarks</div>
+        ${coachCards}
       </div>
 
-      <div class="grid-2" style="margin-bottom:12px">
-        <div class="card"><div class="card-title">Questioning Balance</div><div class="chart-wrap"><canvas id="cQ"></canvas></div></div>
-        <div class="card"><div class="card-title">When You Coach</div><div class="chart-wrap"><canvas id="cW"></canvas></div></div>
-      </div>
-      <div class="grid-2" style="margin-bottom:12px">
-        <div class="card"><div class="card-title">Praise & Feedback</div><div class="chart-wrap"><canvas id="cP"></canvas></div></div>
-        <div class="card"><div class="card-title">Full Breakdown</div><div class="chart-wrap"><canvas id="cB"></canvas></div></div>
-      </div>
-
-      <div class="card" style="margin-bottom:12px">
-        <div class="card-title">Session Metrics</div>
-        ${[
-          {l:'High-Order Questions',v:s.high_order_q,mx:20,tip:'What/Why/How/What if — develops game intelligence'},
-          {l:'Low-Order Questions',v:s.low_order_q,mx:30,tip:'Recall questions — mix with high-order for balance'},
-          {l:'Individual Praise',v:s.individual_praise,mx:25,tip:'Specific praise by name is more powerful than general'},
-          {l:'Team Praise',v:s.team_praise,mx:15,tip:'Celebrate collective effort to build team identity'},
-          {l:'Positive Reinforcement',v:s.positive_reinforcement,mx:15,tip:'"Try again", "keep going" — builds resilience'},
-          {l:'Technical Feedback',v:s.technical_feedback,mx:25,tip:'How they execute — body position, technique'},
-          {l:'Tactical Feedback',v:s.tactical_feedback,mx:25,tip:'Why they do it — space, options, positioning'},
-          {l:'Check for Understanding',v:s.check_for_understanding,mx:12,tip:'"Does that make sense?" before moving on'},
-          {l:'Demonstrations',v:s.show_me_count,mx:8,tip:'Use the ball to paint the picture'},
-          {l:'Freeze Moments',v:s.freeze_moment,mx:8,tip:'Freeze → Demo → Rehearse → Restart'},
-          {l:'Values Referenced',v:s.values_referenced,mx:8,tip:'Connecting language to team values reinforces culture'},
-        ].map(m=>`<div class="metric-row"><div class="metric-row-label">${m.l}</div><div class="metric-row-bar"><div class="metric-row-fill" style="width:${pct(m.v,m.mx)}%;background:${pct(m.v,m.mx)>60?'var(--lime)':pct(m.v,m.mx)>30?'#f59e0b':'#ef4444'}"></div></div><div class="metric-row-val">${parseInt(m.v)||0}</div></div><div style="font-size:11px;color:var(--text-faint);margin-bottom:8px;padding-left:163px">${m.tip}</div>`).join('')}
-      </div>
+      ${focusCueHtml}
 
       ${actions.length?`<div class="card" style="margin-bottom:12px;border-left:4px solid var(--lime)">
-        <div class="card-title">2 Focus Areas for Your Next Session</div>
+        <div class="card-title">Supporting Focus Areas</div>
         ${actions.map((a,i)=>`<div style="background:var(--lime-pale);border:1px solid var(--border);border-radius:var(--radius-xs);padding:12px;margin-bottom:8px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--dark);margin-bottom:5px">Focus ${i+1} — ${a.area||''}</div>
-          <div style="font-size:14px;font-weight:600;color:var(--dark);margin-bottom:5px">→ ${a.action||''}</div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--dark);margin-bottom:5px">Area ${i+1} — ${a.area||''}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--dark);margin-bottom:5px">→ ${a.action||''}</div>
           ${a.why?`<div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:7px">${a.why}</div>`:''}
           ${a.tip?`<div style="background:var(--dark);color:var(--lime);border-radius:var(--radius-xs);padding:7px 10px;font-size:12px;font-style:italic">💡 ${a.tip}</div>`:''}
         </div>`).join('')}
@@ -1567,24 +1602,25 @@ const Sessions={
 
       <div class="card" style="margin-bottom:12px">
         <div class="card-title">Session Reflection</div>
-        <div class="form-group"><label class="label">What went well in this session?</label><textarea id="rw" class="input" style="min-height:70px">${s.reflection_well||''}</textarea></div>
-        <div class="form-group"><label class="label">If you could do it again, what would you do differently?</label><textarea id="rd" class="input" style="min-height:70px">${s.reflection_differently||''}</textarea></div>
+        <div class="form-group"><label class="label">What went well?</label><textarea id="rw" class="input" style="min-height:70px">${s.reflection_well||''}</textarea></div>
+        <div class="form-group"><label class="label">What would you do differently?</label><textarea id="rd" class="input" style="min-height:70px">${s.reflection_differently||''}</textarea></div>
         <button class="btn btn-primary btn-sm" onclick="Sessions.saveReflection('${esc(id)}')">Save Reflection</button>
       </div>
 
       <div class="card">
-        <div class="card-header"><div class="card-title">Written Feedforward</div><button class="btn btn-sm btn-dark" onclick="Sessions.exportFF('${esc(id)}')">Export / Print</button></div>
+        <div class="card-header"><div class="card-title">Written Feedforward — Jamie McLeod</div><button class="btn btn-sm btn-dark" onclick="Sessions.exportFF('${esc(id)}')">Export / Print</button></div>
         <div class="feedforward-doc">
-          <div class="ff-header"><h2>${s.title||'Session Feedforward'}</h2><p style="font-size:12px;color:var(--text-muted)">${s.date||''} · ${s.age_group||''} · ${ctx.phase} · Grade: ${s.grade||'—'}</p></div>
+          <div class="ff-header"><h2>${s.title||'Session Feedforward'}</h2><p style="font-size:12px;color:var(--text-muted)">${s.date||''} · ${s.age_group||''} · ${ctx.phase} · Grade: ${s.grade||'—'}${s.profile_label?' · '+s.profile_label:''}</p></div>
           ${s.encouragement?`<div class="ff-section"><h3>What You Did Well</h3><p>${s.encouragement}</p></div>`:''}
-          ${(s.focus_area_1||s.focus_area_2)?`<div class="ff-section"><h3>Two Areas to Develop</h3>${s.focus_area_1?`<p style="margin-bottom:4px"><strong>1. ${s.focus_area_1}</strong></p>`:''}${s.focus_area_2?`<p><strong>2. ${s.focus_area_2}</strong></p>`:''}</div>`:''}
-          ${s.ai_feedforward?`<div class="ff-section"><h3>Full Feedforward</h3><div class="ff-tip">${s.ai_feedforward.replace(/\n/g,'<br>')}</div></div>`:''}
+          ${s.focus_cue_title?'<div class="ff-section"><h3>Focus for Next Session</h3><p><strong>'+s.focus_cue_title+'</strong></p>'+(s.focus_cue_why?'<p>'+s.focus_cue_why+'</p>':'')+'</div>':''}
+          ${s.ai_feedforward?'<div class="ff-section"><h3>Full Feedforward</h3><div class="ff-tip">'+s.ai_feedforward.replace(/\n/g,'<br>')+'</div></div>':''}
         </div>
       </div>
     </div>`);
 
     setTimeout(()=>Sessions.drawCharts(s),80);
   },
+
 
   toggleFullReport(id){
     const el=document.getElementById('fullReport-'+id);
