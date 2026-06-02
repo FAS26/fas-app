@@ -382,15 +382,24 @@ textarea.input{resize:vertical;min-height:80px;line-height:1.6;}
 <!-- ADD PLAYER MODAL -->
 <div class="modal-bg" id="addPlayerModal">
   <div class="modal">
-    <div class="modal-title">Add Player</div>
-    <div style="display:grid;grid-template-columns:1fr 55px 75px;gap:10px">
-      <div class="form-group"><label class="label">Name</label><input type="text" id="ap-name" class="input" placeholder="Player name"></div>
-      <div class="form-group"><label class="label">#</label><input type="number" id="ap-num" class="input"></div>
-      <div class="form-group"><label class="label">Position</label><input type="text" id="ap-pos" class="input"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('addPlayerModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="Team.addPlayer()">Add</button>
+    <div class="modal-content">
+      <div class="modal-title">Add Player</div>
+      <div style="display:grid;grid-template-columns:1fr 55px 75px;gap:10px">
+        <div class="form-group"><label class="label">Name</label><input type="text" id="ap-name" class="input" placeholder="Player name"></div>
+        <div class="form-group"><label class="label">#</label><input type="number" id="ap-num" class="input"></div>
+        <div class="form-group"><label class="label">Position</label>
+          <select id="ap-pos" class="input">
+            <option value="">Select</option>
+            <option>GK</option><option>RB</option><option>CB</option><option>LB</option>
+            <option>CDM</option><option>CM</option><option>CAM</option>
+            <option>RW</option><option>LW</option><option>ST</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('addPlayerModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="Team.addPlayer()">Add Player</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2993,34 +3002,37 @@ Write a reflection. Share it with someone who will challenge you.`},
   },
 
   showAddPlayer(){
-    const m=document.getElementById('addPlayerModal');
-    if(!m)return;
-    m.querySelector('.modal-content').innerHTML='<div class="modal-body">'
-      +'<h3 style="margin-bottom:16px">Add Player</h3>'
-      +'<div class="form-group"><label class="label">Name</label><input id="ap-name" class="input" placeholder="Full name"></div>'
-      +'<div class="form-group"><label class="label">Number</label><input id="ap-num" class="input" type="number" placeholder="#"></div>'
-      +'<div class="form-group"><label class="label">Position</label>'
-        +'<select id="ap-pos" class="input"><option value="">Select</option>'
-        +'<option>GK</option><option>RB</option><option>CB</option><option>LB</option>'
-        +'<option>CDM</option><option>CM</option><option>CAM</option><option>RW</option><option>LW</option><option>ST</option>'
-        +'</select></div>'
-      +'<div style="display:flex;gap:8px;margin-top:16px">'
-        +'<button class="btn btn-primary" onclick="Team.addPlayer()">Add Player</button>'
-        +'<button class="btn" onclick="closeModal(\'addPlayerModal\')">Cancel</button>'
-      +'</div></div>';
+    // Clear fields
+    const apName=document.getElementById('ap-name');
+    const apNum=document.getElementById('ap-num');
+    const apPos=document.getElementById('ap-pos');
+    if(apName)apName.value='';
+    if(apNum)apNum.value='';
+    if(apPos)apPos.value='';
     openModal('addPlayerModal');
   },
+
 
   async addPlayer(){
     const name=document.getElementById('ap-name')?.value?.trim();
     const num=document.getElementById('ap-num')?.value?.trim();
     const pos=document.getElementById('ap-pos')?.value?.trim();
-    if(!name)return;
-    const{data}=await sb.from('roster').insert({user_id:State.user.id,coach_name:coachName(),name,number:num||'',position:pos||'',stats:{goals:0,assists:0,saves:0,gamesPlayed:0,gamesStarted:0,minutesPlayed:0},positions_played:pos?[pos]:[]}).select().single();
+    if(!name){alert('Please enter a player name.');return;}
+    const{data,error}=await sb.from('roster').insert({
+      user_id:State.user.id,
+      coach_name:coachName(),
+      name,
+      number:num||'',
+      position:pos||'',
+      stats:{goals:0,assists:0,saves:0,gamesPlayed:0,minutesPlayed:0},
+      positions_played:pos?[pos]:[]
+    }).select().single();
+    if(error){alert('Error adding player: '+error.message);return;}
     if(data)State.roster.push(data);
     closeModal('addPlayerModal');
     Team.renderPlayers();
   },
+
 
   async deletePlayer(id){
     if(!confirm('Remove this player?'))return;
