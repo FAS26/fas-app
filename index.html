@@ -2838,6 +2838,151 @@ Write a reflection. Share it with someone who will challenge you.`},
   },
 
 
+  renderPlayers(){
+    State.currentSubSection='players';
+    const roster=State.roster||[];
+    const interactions=State.interactions||[];
+    const checkins=State.checkins||[];
+
+    // Build interaction counts per player per type
+    const interactionMap={};
+    interactions.forEach(i=>{
+      if(!interactionMap[i.player_name])interactionMap[i.player_name]={praise:0,reinforcement:0,feedback:0,correction:0,total:0};
+      interactionMap[i.player_name][i.type]=(interactionMap[i.player_name][i.type]||0)+1;
+      interactionMap[i.player_name].total++;
+    });
+
+    // 21-day alert
+    const today=new Date();
+    const needsCheckin=roster.filter(p=>{
+      const lastCI=checkins.filter(c=>c.player_name===p.name).sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+      if(!lastCI)return true;
+      return Math.floor((today-new Date(lastCI.date))/(1000*60*60*24))>21;
+    });
+
+    const typeColors={praise:'#84cc16',reinforcement:'#3b82f6',feedback:'#f59e0b',correction:'#ef4444'};
+    const typeLabels={praise:'Praise',reinforcement:'Reinforcement',feedback:'Feedback',correction:'Correction'};
+
+    const heatmapRows=roster.map(p=>{
+      const im=interactionMap[p.name]||{praise:0,reinforcement:0,feedback:0,correction:0,total:0};
+      const total=im.total||0;
+      const needs=needsCheckin.find(n=>n.name===p.name);
+      const lastCI=checkins.filter(c=>c.player_name===p.name).sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+      const daysSince=lastCI?Math.floor((today-new Date(lastCI.date))/(1000*60*60*24)):999;
+
+      const bars=total>0
+        ?Object.entries(typeColors).map(([type,color])=>{
+            const count=im[type]||0;
+            const width=Math.round((count/Math.max(total,1))*100);
+            return width>0?`<div class="heatmap-seg" title="${typeLabels[type]}: ${count}" style="width:${Math.max(width,4)}%;background:${color};opacity:0.85"></div>`:'';
+          }).join('')
+        :`<div style="font-size:11px;color:var(--text-faint);padding-left:4px">No interactions logged</div>`;
+
+      const safeId=p.name.replace(/\s/g,'_');
+
+      return `<div class="heatmap-row" style="cursor:pointer" onclick="Team.openPlayer('${esc(p.name)}')">
+        <div class="heatmap-name">
+          <div style="font-size:13px;font-weight:600;color:var(--dark)">${p.name}</div>
+          <div style="font-size:10px;color:var(--text-faint)">${p.position||'—'} ${p.number?'#'+p.number:''}</div>
+        </div>
+        <div class="heatmap-bars">${bars}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+          ${needs?`<span style="font-size:10px;background:#fee2e2;color:#dc2626;padding:2px 7px;border-radius:100px;font-weight:600">⚠ ${daysSince===999?'Never':daysSince+'d'}</span>`:''}
+          <span style="font-size:11px;font-weight:700;color:var(--dark)">${total}</span>
+          <span style="font-size:11px;color:var(--text-faint)">›</span>
+        </div>
+      </div>
+      <div id="pc-${safeId}" style="display:none;padding:14px;background:var(--lime-pale);border-bottom:1px solid var(--border)">
+        ${Teams_playerDetail(p, im, checkins.filter(c=>c.player_name===p.name), typeColors, typeLabels)}
+      </div>`;
+    }).join('');
+
+    function Teams_playerDetail(p,im,pCheckins,typeColors,typeLabels){
+      const stats=p.stats||{goals:0,assists:0,saves:0,gamesPlayed:0,minutesPlayed:0};
+      const positions=p.positions_played||[];
+      const allPositions=['GK','RB','CB','LB','CDM','CM','CAM','RW','LW','ST'];
+      const safeId=p.name.replace(/\s/g,'_');
+      return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
+        // Left: stats + positions
+        +'<div>'
+          +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:8px">Stats</div>'
+          +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
+            +Object.entries({Goals:stats.goals||0,Assists:stats.assists||0,Saves:stats.saves||0,Games:stats.gamesPlayed||0}).map(([l,v])=>
+              `<div style="background:var(--dark);border-radius:8px;padding:8px 12px;text-align:center;min-width:52px">`
+              +`<div style="font-size:18px;font-weight:800;color:var(--lime)">${v}</div>`
+              +`<div style="font-size:10px;color:var(--lime-muted)">${l}</div></div>`
+            ).join('')
+          +'</div>'
+          +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:8px">Positions Played</div>'
+          +'<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">'
+            +allPositions.map(pos=>`<button onclick="Team.togglePosition('${p.name}','${pos}')" style="padding:3px 10px;border-radius:100px;border:1.5px solid ${positions.includes(pos)?'var(--lime)':'var(--border)'};background:${positions.includes(pos)?'var(--lime)':'var(--surface)'};color:${positions.includes(pos)?'var(--dark-deep)':'var(--text-muted)'};font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)">${pos}</button>`).join('')
+          +'</div>'
+        +'</div>'
+        // Right: interaction breakdown + check-in
+        +'<div>'
+          +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:8px">Interaction Breakdown</div>'
+          +'<div style="margin-bottom:12px">'
+            +Object.entries(typeColors).map(([type,color])=>{
+              const count=im[type]||0;
+              const total=im.total||0;
+              const pct=total?Math.round(count/total*100):0;
+              return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">`
+                +`<div style="width:90px;font-size:12px;color:var(--text-muted)">${typeLabels[type]}</div>`
+                +`<div style="flex:1;height:8px;background:var(--lime-pale);border-radius:4px;overflow:hidden">`
+                  +`<div style="height:100%;width:${pct}%;background:${color};border-radius:4px"></div>`
+                +`</div>`
+                +`<div style="font-size:12px;font-weight:700;min-width:20px;text-align:right">${count}</div>`
+              +'</div>';
+            }).join('')
+          +'</div>'
+          +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:8px">Check-in Note</div>'
+          +`<textarea id="ci-${safeId}" class="input" placeholder="Add a check-in note for ${p.name}..." style="min-height:60px;font-size:12px"></textarea>`
+          +`<button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="Team.saveCheckin('${p.name}')">Save Note</button>`
+          +(pCheckins.length?'<div style="margin-top:8px">'
+            +pCheckins.slice(0,3).map(c=>`<div style="font-size:11px;color:var(--text-muted);padding:4px 0;border-bottom:1px solid var(--border)">${c.date} — ${c.notes}</div>`).join('')
+            +'</div>':'')
+        +'</div>'
+      +'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:12px">'
+        +`<button class="btn btn-sm" onclick="Team.logInteraction('${p.name}')">Log Interaction</button>`
+        +`<button class="btn btn-danger btn-sm" onclick="Team.deletePlayer('${p.id}')">Remove</button>`
+      +'</div>';
+    }
+
+    setMain(`
+    <div class="page-header">
+      <div><h1>Players</h1><p>${roster.length} players · ${interactions.length} interactions logged</p></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-dark" onclick="openModal('logInteractionModal')">Log Interaction</button>
+        <button class="btn btn-primary" onclick="Team.showAddPlayer()">+ Add Player</button>
+      </div>
+    </div>
+    <div class="page-body">
+      ${needsCheckin.length?`<div class="alert alert-warn" style="margin-bottom:14px">
+        <strong>⚠ Check-in needed:</strong> ${needsCheckin.map(p=>p.name).join(', ')} — no check-in in 21+ days.
+      </div>`:''}
+
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Connection Heatmap</div>
+        <div style="display:flex;gap:14px;margin-bottom:12px;font-size:11px;flex-wrap:wrap">
+          ${Object.entries(typeColors).map(([t,c])=>`<span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:2px;background:${c};display:inline-block"></span>${typeLabels[t]}</span>`).join('')}
+        </div>
+        ${!roster.length?`<div class="empty" style="padding:20px"><p>No players added yet. Add players to start tracking interactions.</p></div>`:''}
+        ${heatmapRows}
+      </div>
+    </div>`);
+
+    // Populate the log interaction modal player list
+    const sel=document.getElementById('li-player');
+    if(sel){sel.innerHTML=roster.map(p=>`<option value="${esc(p.name)}">${p.name}</option>`).join('');}
+  },
+
+  logInteraction(playerName){
+    const sel=document.getElementById('li-player');
+    if(sel)sel.value=playerName;
+    openModal('logInteractionModal');
+  },
+
   openPlayer(name){
     const safeId=name.replace(/\s/g,'_');
     const el=document.getElementById('pc-'+safeId);
